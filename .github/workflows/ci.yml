@@ -1,0 +1,66 @@
+name: CI
+
+# Pre-merge checks. Runs on the dev branch and on every pull request aimed at
+# dev or main, so breakage is caught before it reaches main and triggers a
+# release. Builds the same debug APK as the release pipeline, but publishes it
+# only as a workflow artifact — no tag, no GitHub Release.
+on:
+  push:
+    branches: [ dev ]
+  pull_request:
+    branches: [ main, dev ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or PR makes the in-flight run obsolete.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Run Android lint
+        run: ./gradlew lintDebug --no-daemon
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProLibertateGames-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload lint and test reports
+        # Reports are most useful precisely when a step above failed.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProLibertateGames-reports
+          path: |
+            app/build/reports/
+          if-no-files-found: ignore
+          retention-days: 14
