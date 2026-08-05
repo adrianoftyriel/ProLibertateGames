@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.Closeable

@@ -192,6 +192,7 @@ fun MainMenuScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GameTile(game: GameDescriptor, onClick: () -> Unit) {
     Card(
