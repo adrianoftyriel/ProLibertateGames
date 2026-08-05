@@ -4,10 +4,20 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-// On CI, GITHUB_RUN_NUMBER is set automatically and matches the release tag
-// (v1.0.<run-number>), so the shipped APK knows its own version and the
-// in-app updater can tell whether a newer release exists. Locally it's a dev build.
-val ciRunNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "").toIntOrNull() ?: 0
+// Only the release workflow stamps a real version. It sets PLG_RELEASE, and its
+// GITHUB_RUN_NUMBER is the same number as the release tag it publishes
+// (v1.0.<run-number>), so the shipped APK knows its own version and the in-app
+// updater can compare against the latest published release.
+//
+// Everything else — a local build, or the dev CI pipeline — stays at 1.0.0-dev.
+// GITHUB_RUN_NUMBER alone is NOT enough to key off: it counts per workflow, so
+// the dev pipeline has its own independent sequence. A debug APK installed from
+// a CI artifact would otherwise carry that counter as its versionCode, could
+// outrank a genuine release, and would leave the updater reporting "you're on
+// the latest version" indefinitely.
+val isReleaseBuild = System.getenv("PLG_RELEASE") == "1"
+val releaseRunNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "").toIntOrNull() ?: 0
+val stampReleaseVersion = isReleaseBuild && releaseRunNumber > 0
 
 android {
     namespace = "org.prolibertate.games"
@@ -17,8 +27,12 @@ android {
         applicationId = "org.prolibertate.games"
         minSdk = 24
         targetSdk = 34
-        versionCode = if (ciRunNumber > 0) ciRunNumber else 1
-        versionName = if (ciRunNumber > 0) "1.0.$ciRunNumber" else "1.0.0-dev"
+        // Dev builds sit at 1, below every release except the very first —
+        // a v1.0.1 release ties with a dev build and so is not offered as an
+        // update. Harmless, and preferable to versionCode 0, which Android
+        // documents as out of range.
+        versionCode = if (stampReleaseVersion) releaseRunNumber else 1
+        versionName = if (stampReleaseVersion) "1.0.$releaseRunNumber" else "1.0.0-dev"
     }
 
     signingConfigs {

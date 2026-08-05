@@ -72,10 +72,19 @@ Requires JDK 17 and the Android SDK (compileSdk 34).
 ## CI
 
 - `.github/workflows/ci.yml` — builds, tests and lints on `dev` and on pull
-  requests into `dev` or `main`.
+  requests into `dev` or `main`. Its APK artifact is a dev build, versioned
+  `1.0.0-dev`.
 - `.github/workflows/release.yml` — on push to `main`, builds the APK and
   publishes it as a GitHub Release tagged `v1.0.<run-number>`. The in-app updater
   reads that tag, which is why the APK's `versionCode` is the same run number.
+
+**OTA updates follow `main`, and only `main`.** The updater asks GitHub for the
+latest published Release; the release workflow is the only thing that creates
+one, and it refuses to run off any branch but `main` — so a manual dispatch
+aimed at `dev` does nothing rather than shipping unreviewed code to every
+install. Only that workflow sets `PLG_RELEASE`, which is what stamps a real
+`versionCode`; dev builds stay at `1.0.0-dev` so a side-loaded CI artifact can
+never outrank a genuine release and suppress future updates.
 
 The debug keystore is committed on purpose: every build is signed with the same
 key, so an OTA update installs over the previous one instead of being rejected

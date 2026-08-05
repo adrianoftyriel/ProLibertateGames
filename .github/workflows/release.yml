@@ -19,7 +19,16 @@ concurrency:
 jobs:
   build:
     name: Build APK and publish release
+    # workflow_dispatch can be aimed at any branch from the Actions UI. Releases
+    # are what the in-app updater installs, so only main may produce one —
+    # anything else is a no-op rather than shipping unreviewed code to everyone.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      # Tells the build this is a real release, so the APK is stamped with the
+      # run number that matches the tag below. Absent everywhere else, which
+      # keeps dev and local builds at 1.0.0-dev.
+      PLG_RELEASE: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
