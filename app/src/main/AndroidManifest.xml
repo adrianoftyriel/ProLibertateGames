@@ -10,25 +10,22 @@
     <!-- Lets the app hand a downloaded APK to the system installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <!-- Bluetooth. Android 12 (API 31) split the old catch-all permissions into
-         explicit SCAN/CONNECT/ADVERTISE, so the legacy pair is capped below 31
-         and the new trio is requested at runtime above it. neverForLocation
-         tells the system we aren't deriving physical location from scans, which
-         avoids dragging in the location permission on 12+. -->
+    <!-- Bluetooth. Android 12 (API 31) replaced the catch-all BLUETOOTH
+         permission with explicit ones, so the legacy pair is capped below 31
+         and BLUETOOTH_CONNECT is requested at runtime above it.
+
+         Only CONNECT is declared because the transport talks exclusively to
+         devices that are already paired: it enumerates bonded devices and
+         opens an RFCOMM socket, neither of which is a scan. Adding discovery
+         of unpaired devices later would mean declaring BLUETOOTH_SCAN here
+         (and, below API 31, both ACCESS_FINE_LOCATION and
+         ACCESS_COARSE_LOCATION, which Android requires together). -->
     <uses-permission android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
         android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation"
-        tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
         tools:targetApi="s" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"
-        tools:targetApi="s" />
-    <!-- Pre-31, Bluetooth discovery is gated behind location access. -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
-        android:maxSdkVersion="30" />
 
     <!-- Both radios are optional: the app is fully playable against AI without them. -->
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />

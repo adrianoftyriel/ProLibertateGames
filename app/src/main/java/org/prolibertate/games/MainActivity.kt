@@ -47,14 +47,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestBluetoothPermissions() {
+        // Only CONNECT: the transport reaches paired devices and never scans.
+        // See the manifest for what discovery of unpaired devices would add.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            bluetoothPermissions.launch(
-                arrayOf(
-                    Manifest.permission.BLUETOOTH_CONNECT,
-                    Manifest.permission.BLUETOOTH_SCAN,
-                    Manifest.permission.BLUETOOTH_ADVERTISE,
-                )
-            )
+            bluetoothPermissions.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
         }
     }
 
