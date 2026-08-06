@@ -17,16 +17,16 @@ game setup screen. Lowest score wins, as on a golf course.
 
 - **Seen at the start — *toggle*.** How many of your own cards you turn over
   before play begins; two by default.
+- One card is turned up to start the discard pile; the rest is the stock.
+- Six players on the 9-card board needs more cards than a deck holds, so two
+  decks are shuffled together whenever the deal would exceed 24 cards.
 
 ## Choosing your openers
 
 Nothing is dealt face up. Each player in turn picks which of their own cards to
 turn over, up to the allowance above, and play begins once everyone has chosen.
 Spreading them across columns tells you more about the board than stacking two
-in the same column.
-- One card is turned up to start the discard pile; the rest is the stock.
-- Six players on the 9-card board needs more cards than a deck holds, so two
-  decks are shuffled together whenever the deal would exceed 24 cards.
+in the same column does.
 
 ## A turn
 
