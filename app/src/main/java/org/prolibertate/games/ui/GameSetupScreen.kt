@@ -263,7 +263,7 @@ private fun GolfOptionsEditor(options: GolfOptions, onChange: (GolfOptions) -> U
         )
         ChipRow(
             label = "Cards each",
-            values = listOf(4, 6, 9),
+            values = listOf(4, 6, 8, 9),
             selected = options.gridSize,
             display = { "$it" },
             onSelect = { size ->
@@ -289,6 +289,13 @@ private fun GolfOptionsEditor(options: GolfOptions, onChange: (GolfOptions) -> U
             selected = options.startingReveals,
             display = { "$it" },
             onSelect = { onChange(options.copy(startingReveals = it)) },
+        )
+        ToggleRow(
+            title = "Line up the final putt",
+            subtitle = "Throw a drawn card away without turning your last card over, " +
+                "rather than being forced to close the hole",
+            checked = options.lineUpFinalPutt,
+            onChange = { onChange(options.copy(lineUpFinalPutt = it)) },
         )
         Text(
             text = "${options.rows} rows of ${options.cols}. Matching columns cancel out" +

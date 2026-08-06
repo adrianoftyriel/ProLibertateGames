@@ -30,6 +30,17 @@ class GolfRulesTest {
 
     private fun card(rank: Rank, suit: Suit = Suit.CLUBS) = Card(rank, suit)
 
+    /** Plays out the opening reveals so a test can start from the first draw. */
+    private fun afterSetup(state: GolfState): GolfState {
+        var s = state
+        var guard = 0
+        while (s.phase == GolfPhase.SETUP && guard++ < 200) {
+            val seat = GolfRules.currentSeat(s)!!
+            s = GolfRules.applyMove(s, seat, GolfRules.legalMoves(s, seat).first())
+        }
+        return s
+    }
+
     // -- Scoring ------------------------------------------------------------
 
     @Test
@@ -98,7 +109,9 @@ class GolfRulesTest {
 
     @Test
     fun `everyone gets a grid and two cards face up`() {
-        val state = GolfRules.initialState(config(GolfOptions(playerCount = 3, gridSize = 6)))
+        val state = afterSetup(
+            GolfRules.initialState(config(GolfOptions(playerCount = 3, gridSize = 6)))
+        )
         assertEquals(3, state.grids.size)
         state.grids.forEach { assertEquals(6, it.size) }
         state.revealed.forEach { assertEquals(2, it.count { shown -> shown }) }
@@ -114,11 +127,133 @@ class GolfRulesTest {
         assertEquals(104, dealt + state.stock.size + state.discard.size)
     }
 
+    @Test
+    fun `the eight card grid is two rows of four`() {
+        val options = GolfOptions(gridSize = 8)
+        assertEquals(2, options.rows)
+        assertEquals(4, options.cols)
+
+        // Columns are (0,4) (1,5) (2,6) (3,7); the queens cancel.
+        val grid = listOf(
+            card(Rank.QUEEN), card(Rank.THREE), card(Rank.FOUR), card(Rank.KING),
+            card(Rank.QUEEN, Suit.HEARTS), card(Rank.FIVE), card(Rank.SIX), card(Rank.SEVEN),
+        )
+        assertEquals(25, scoreGrid(grid, options))
+    }
+
+    // -- Choosing the opening cards -----------------------------------------
+
+    @Test
+    fun `a hole starts with everything face down and a choice to make`() {
+        val state = GolfRules.initialState(config(GolfOptions(playerCount = 3, gridSize = 6)))
+        assertEquals(GolfPhase.SETUP, state.phase)
+        assertTrue("nothing is dealt face up", state.revealed.all { row -> row.none { it } })
+        assertEquals("every card is a candidate", 6, GolfRules.legalMoves(state, state.turn).size)
+    }
+
+    @Test
+    fun `each player picks their own openers in turn`() {
+        var state = GolfRules.initialState(config(GolfOptions(playerCount = 2, gridSize = 6)))
+        val first = state.turn
+
+        state = GolfRules.applyMove(state, first, RevealCard(3))
+        assertTrue("the chosen card is the one turned over", state.revealed[first][3])
+        assertEquals("still choosing", first, state.turn)
+
+        state = GolfRules.applyMove(state, first, RevealCard(5))
+        assertEquals("allowance used, next player chooses", (first + 1) % 2, state.turn)
+        assertEquals(GolfPhase.SETUP, state.phase)
+
+        val second = state.turn
+        state = GolfRules.applyMove(state, second, RevealCard(0))
+        state = GolfRules.applyMove(state, second, RevealCard(1))
+        assertEquals("everyone has chosen, so play begins", GolfPhase.DRAW, state.phase)
+    }
+
+    @Test
+    fun `with no opening reveals the hole starts straight away`() {
+        val state = GolfRules.initialState(
+            config(GolfOptions(playerCount = 2, gridSize = 4, startingReveals = 0))
+        )
+        assertEquals(GolfPhase.DRAW, state.phase)
+    }
+
+    // -- Lining up the final putt -------------------------------------------
+
+    @Test
+    fun `lining up the putt is only offered on the last face-down card`() {
+        val options = GolfOptions(
+            playerCount = 2, gridSize = 4, startingReveals = 2,
+            holes = 1, lineUpFinalPutt = true,
+        )
+        var state = afterSetup(GolfRules.initialState(config(options)))
+        state = GolfRules.applyMove(state, 0, DrawFromStock)
+
+        assertEquals("two cards still face down", 2, state.faceDownCount(0))
+        assertFalse("not yet — this is not the final putt",
+            GolfRules.legalMoves(state, 0).contains(DiscardOnly))
+
+        // Turn one over, leaving exactly one down, and come back round.
+        state = GolfRules.applyMove(state, 0, DiscardAndFlip(2))
+        state = GolfRules.applyMove(state, 1, DrawFromStock)
+        state = GolfRules.applyMove(state, 1, ReplaceCard(0))
+        state = GolfRules.applyMove(state, 0, DrawFromStock)
+
+        assertEquals(1, state.faceDownCount(0))
+        assertTrue("now it is offered", GolfRules.legalMoves(state, 0).contains(DiscardOnly))
+    }
+
+    @Test
+    fun `lining up the putt keeps the last card down and does not close the hole`() {
+        val options = GolfOptions(
+            playerCount = 2, gridSize = 4, startingReveals = 3,
+            holes = 1, lineUpFinalPutt = true,
+        )
+        var state = afterSetup(GolfRules.initialState(config(options)))
+        state = GolfRules.applyMove(state, 0, DrawFromStock)
+        val drawn = state.drawn!!
+
+        state = GolfRules.applyMove(state, 0, DiscardOnly)
+        assertEquals("the card is thrown", drawn, state.discard.last())
+        assertEquals("the last card stays down", 1, state.faceDownCount(0))
+        assertEquals("nobody has closed", null, state.closedBy)
+        assertEquals("turn passes anyway", 1, state.turn)
+    }
+
+    @Test
+    fun `the option is off by default so nobody can stall`() {
+        val options = GolfOptions(playerCount = 2, gridSize = 4, startingReveals = 3, holes = 1)
+        var state = afterSetup(GolfRules.initialState(config(options)))
+        state = GolfRules.applyMove(state, 0, DrawFromStock)
+        assertFalse(GolfRules.legalMoves(state, 0).contains(DiscardOnly))
+    }
+
+    @Test
+    fun `a table that refuses to putt out still ends`() {
+        // Everyone declines forever; the hole is called rather than hanging.
+        val options = GolfOptions(
+            playerCount = 2, gridSize = 4, startingReveals = 3,
+            holes = 1, lineUpFinalPutt = true,
+        )
+        var state = afterSetup(GolfRules.initialState(config(options)))
+        var guard = 0
+        while (!GolfRules.isFinished(state) && guard++ < 200) {
+            val seat = GolfRules.currentSeat(state) ?: break
+            val legal = GolfRules.legalMoves(state, seat)
+            // Always draw, and always decline to close when allowed.
+            val move = legal.firstOrNull { it == DiscardOnly }
+                ?: legal.firstOrNull { it == DrawFromStock }
+                ?: legal.first()
+            state = GolfRules.applyMove(state, seat, move)
+        }
+        assertTrue("the stalemate guard has to end it", GolfRules.isFinished(state))
+    }
+
     // -- Turn structure -----------------------------------------------------
 
     @Test
     fun `a turn is draw then place`() {
-        var state = GolfRules.initialState(config(GolfOptions(playerCount = 2)))
+        var state = afterSetup(GolfRules.initialState(config(GolfOptions(playerCount = 2))))
         assertEquals(setOf(DrawFromStock, DrawFromDiscard), GolfRules.legalMoves(state, 0).toSet())
 
         state = GolfRules.applyMove(state, 0, DrawFromStock)
@@ -132,7 +267,7 @@ class GolfRulesTest {
 
     @Test
     fun `a card taken from the discard pile must be used`() {
-        var state = GolfRules.initialState(config(GolfOptions(playerCount = 2)))
+        var state = afterSetup(GolfRules.initialState(config(GolfOptions(playerCount = 2))))
         state = GolfRules.applyMove(state, 0, DrawFromDiscard)
         val moves = GolfRules.legalMoves(state, 0)
         assertTrue("no throwing it back", moves.none { it is DiscardAndFlip })
@@ -141,7 +276,7 @@ class GolfRulesTest {
 
     @Test
     fun `replacing a card turns that slot face up and discards the old one`() {
-        var state = GolfRules.initialState(config(GolfOptions(playerCount = 2)))
+        var state = afterSetup(GolfRules.initialState(config(GolfOptions(playerCount = 2))))
         state = GolfRules.applyMove(state, 0, DrawFromStock)
         val drawn = state.drawn!!
         val replacedCard = state.grids[0][5]
@@ -156,7 +291,7 @@ class GolfRulesTest {
 
     @Test
     fun `throwing the drawn card turns one of your own over`() {
-        var state = GolfRules.initialState(config(GolfOptions(playerCount = 2)))
+        var state = afterSetup(GolfRules.initialState(config(GolfOptions(playerCount = 2))))
         state = GolfRules.applyMove(state, 0, DrawFromStock)
         val drawn = state.drawn!!
         assertFalse(state.revealed[0][4])
@@ -171,7 +306,7 @@ class GolfRulesTest {
     @Test
     fun `turning the last card over gives everyone else one more turn`() {
         val options = GolfOptions(playerCount = 3, gridSize = 4, startingReveals = 3, holes = 1)
-        var state = GolfRules.initialState(config(options))
+        var state = afterSetup(GolfRules.initialState(config(options)))
         // Seat 0 has one card left face down; use it to close.
         state = GolfRules.applyMove(state, 0, DrawFromStock)
         state = GolfRules.applyMove(state, 0, DiscardAndFlip(3))
@@ -193,7 +328,7 @@ class GolfRulesTest {
     @Test
     fun `scores accumulate across holes`() {
         val options = GolfOptions(playerCount = 2, gridSize = 4, startingReveals = 4, holes = 3)
-        var state = GolfRules.initialState(config(options))
+        var state = afterSetup(GolfRules.initialState(config(options)))
         var guard = 0
         while (state.hole == 0 && !GolfRules.isFinished(state) && guard++ < 400) {
             val seat = GolfRules.currentSeat(state) ?: break
@@ -276,7 +411,9 @@ class GolfRulesTest {
 
     @Test
     fun `a view hides face-down cards including your own`() {
-        val state = GolfRules.initialState(config(GolfOptions(playerCount = 2, gridSize = 6)))
+        val state = afterSetup(
+            GolfRules.initialState(config(GolfOptions(playerCount = 2, gridSize = 6)))
+        )
         val view = GolfRules.viewFor(state, seat = 0)
 
         for (index in 0 until 6) {
@@ -293,7 +430,9 @@ class GolfRulesTest {
     fun `masking does not leak the real card`() {
         // A grid deliberately built with no twos of spades in it, so if the
         // mask ever showed through it would be obvious.
-        val state = GolfRules.initialState(config(GolfOptions(playerCount = 2, gridSize = 6), seed = 42L))
+        val state = afterSetup(
+            GolfRules.initialState(config(GolfOptions(playerCount = 2, gridSize = 6), seed = 42L))
+        )
         val view = GolfRules.viewFor(state, seat = 1)
         val hiddenIndices = (0 until 6).filter { !state.revealed[1][it] }
         hiddenIndices.forEach { index ->
@@ -308,7 +447,10 @@ class GolfRulesTest {
     fun `state and moves survive a round trip`() {
         val state = GolfRules.initialState(config())
         assertEquals(state, GolfRules.decodeState(GolfRules.encodeState(state)))
-        listOf(DrawFromStock, DrawFromDiscard, ReplaceCard(2), DiscardAndFlip(5)).forEach {
+        listOf(
+            DrawFromStock, DrawFromDiscard, ReplaceCard(2), DiscardAndFlip(5),
+            DiscardOnly, RevealCard(1),
+        ).forEach {
             assertEquals(it, GolfRules.decodeMove(GolfRules.encodeMove(it)))
         }
     }

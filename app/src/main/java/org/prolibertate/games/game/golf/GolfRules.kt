@@ -55,11 +55,9 @@ object GolfRules : GameRules<GolfState, GolfMove> {
             deck = deck.drop(options.gridSize)
         }
 
-        // The opening reveals are the leftmost cards of the top row, so every
-        // player starts knowing the same shape of their own board.
-        val revealed = List(options.playerCount) {
-            List(options.gridSize) { index -> index < options.startingReveals }
-        }
+        // Nothing starts face up: each player chooses which of their own cards
+        // to turn over, which is a real decision rather than a dealt-out one.
+        val revealed = List(options.playerCount) { List(options.gridSize) { false } }
 
         val firstDiscard = deck.first()
         return GolfState(
@@ -77,7 +75,8 @@ object GolfRules : GameRules<GolfState, GolfMove> {
             finalTurnsLeft = 0,
             holeScores = List(options.playerCount) { 0 },
             scores = scores,
-            phase = GolfPhase.DRAW,
+            phase = if (options.startingReveals > 0) GolfPhase.SETUP else GolfPhase.DRAW,
+            idleDiscards = 0,
             log = log,
         )
     }
@@ -95,7 +94,7 @@ object GolfRules : GameRules<GolfState, GolfMove> {
     }
 
     override fun currentSeat(state: GolfState): Int? = when (state.phase) {
-        GolfPhase.DRAW, GolfPhase.PLACE -> state.turn
+        GolfPhase.SETUP, GolfPhase.DRAW, GolfPhase.PLACE -> state.turn
         GolfPhase.HOLE_OVER, GolfPhase.GAME_OVER -> null
     }
 
@@ -106,6 +105,10 @@ object GolfRules : GameRules<GolfState, GolfMove> {
     override fun legalMoves(state: GolfState, seat: Int): List<GolfMove> {
         if (currentSeat(state) != seat) return emptyList()
         return when (state.phase) {
+            GolfPhase.SETUP -> (0 until state.options.gridSize)
+                .filter { !state.revealed[seat][it] }
+                .map { RevealCard(it) }
+
             GolfPhase.DRAW -> buildList {
                 if (state.stock.isNotEmpty()) add(DrawFromStock)
                 if (state.discard.isNotEmpty()) add(DrawFromDiscard)
@@ -118,6 +121,11 @@ object GolfRules : GameRules<GolfState, GolfMove> {
                 if (!state.drawnFromDiscard) {
                     for (index in 0 until state.options.gridSize) {
                         if (!state.revealed[seat][index]) add(DiscardAndFlip(index))
+                    }
+                    // Lining up the final putt: decline to turn over the last
+                    // card, rather than being forced to close the hole with it.
+                    if (state.options.lineUpFinalPutt && state.faceDownCount(seat) == 1) {
+                        add(DiscardOnly)
                     }
                 }
             }
@@ -150,7 +158,34 @@ object GolfRules : GameRules<GolfState, GolfMove> {
 
             is ReplaceCard -> applyReplace(state, seat, move.index)
             is DiscardAndFlip -> applyDiscardAndFlip(state, seat, move.index)
+            is DiscardOnly -> applyDiscardOnly(state, seat)
+            is RevealCard -> applyReveal(state, seat, move.index)
         }
+    }
+
+    /**
+     * Turning over one of your opening cards. When a seat has seen its
+     * allowance the choice passes on, and once everyone has chosen the hole
+     * begins.
+     */
+    private fun applyReveal(state: GolfState, seat: Int, index: Int): GolfState {
+        val revealed = state.revealed.map { it.toMutableList() }
+        revealed[seat][index] = true
+
+        val chosen = revealed[seat].count { it }
+        if (chosen < state.options.startingReveals) {
+            return state.copy(revealed = revealed)
+        }
+
+        val next = (seat + 1) % state.options.playerCount
+        val everyoneReady = revealed.all { row ->
+            row.count { it } >= state.options.startingReveals
+        }
+        return state.copy(
+            revealed = revealed,
+            turn = if (everyoneReady) state.hole % state.options.playerCount else next,
+            phase = if (everyoneReady) GolfPhase.DRAW else GolfPhase.SETUP,
+        )
     }
 
     private fun applyReplace(state: GolfState, seat: Int, index: Int): GolfState {
@@ -191,12 +226,32 @@ object GolfRules : GameRules<GolfState, GolfMove> {
         )
     }
 
+    private fun applyDiscardOnly(state: GolfState, seat: Int): GolfState {
+        val drawn = requireNotNull(state.drawn) { "Nothing drawn" }
+        return endTurn(
+            state.copy(
+                discard = state.discard + drawn,
+                drawn = null,
+                idleDiscards = state.idleDiscards + 1,
+                log = state.log + "Seat $seat throws ${drawn.label} and lines up the putt.",
+            ),
+            seat,
+            idle = true,
+        )
+    }
+
     /**
      * Closes out a turn: notices a finished grid, counts down the last lap and
      * either moves on or scores the hole.
      */
-    private fun endTurn(state: GolfState, seat: Int): GolfState {
-        var next = state
+    private fun endTurn(state: GolfState, seat: Int, idle: Boolean = false): GolfState {
+        var next = if (idle) state else state.copy(idleDiscards = 0)
+
+        // Everyone declining to close, round after round, would never end. Two
+        // full laps of nothing but thrown cards is taken as the hole being over.
+        if (next.idleDiscards >= next.options.playerCount * 2) {
+            return scoreHole(next.copy(log = next.log + "Nobody will putt out — hole called."))
+        }
 
         // The first player to turn everything over gives everyone else one
         // more turn, and no more than one.

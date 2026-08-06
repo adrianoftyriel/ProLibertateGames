@@ -145,6 +145,8 @@ fun PlayScreen(
                     advanceIdle = { state ->
                         if (state.phase == GolfPhase.HOLE_OVER) GolfRules.nextHole(state) else null
                     },
+                    // The score card is read before the next hole is dealt.
+                    awaitsConfirmation = { state -> state.phase == GolfPhase.HOLE_OVER },
                     aiThinkingMillis = { settings.scaled(700L) },
                 )
             }

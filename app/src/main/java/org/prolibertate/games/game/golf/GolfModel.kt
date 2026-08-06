@@ -9,16 +9,22 @@ import org.prolibertate.games.game.cards.Suit
 @Serializable
 data class GolfOptions(
     val playerCount: Int = 2,
-    /** Cards in front of each player: 4 (2x2), 6 (2x3) or 9 (3x3). */
+    /** Cards in front of each player: 4 (2x2), 6 (2x3), 8 (2x4) or 9 (3x3). */
     val gridSize: Int = 6,
     val holes: Int = 9,
-    /** How many of your own cards you get to see before play starts. */
+    /** How many of your own cards you turn over before play starts. */
     val startingReveals: Int = 2,
+    /**
+     * Lining up the final putt: lets you throw a drawn card away without
+     * turning your last face-down card over, so you are not forced to close
+     * the hole on a card you have not chosen.
+     */
+    val lineUpFinalPutt: Boolean = false,
 ) {
     init {
         require(playerCount in 2..6) { "Golf seats two to six" }
-        require(gridSize == 4 || gridSize == 6 || gridSize == 9) {
-            "Golf grids are 4, 6 or 9 cards"
+        require(gridSize in setOf(4, 6, 8, 9)) {
+            "Golf grids are 4, 6, 8 or 9 cards"
         }
         require(holes >= 1) { "holes must be positive" }
         require(startingReveals in 0..gridSize) { "cannot reveal more than the grid holds" }
@@ -82,7 +88,14 @@ fun scoreGrid(cards: List<Card>, options: GolfOptions): Int {
 val HIDDEN_CARD: Card = Card(Rank.TWO, Suit.SPADES)
 
 @Serializable
-enum class GolfPhase { DRAW, PLACE, HOLE_OVER, GAME_OVER }
+enum class GolfPhase {
+    /** Each player choosing which of their own cards to turn over first. */
+    SETUP,
+    DRAW,
+    PLACE,
+    HOLE_OVER,
+    GAME_OVER,
+}
 
 @Serializable
 data class GolfState(
@@ -105,9 +118,17 @@ data class GolfState(
     val holeScores: List<Int>,
     val scores: List<Int>,
     val phase: GolfPhase,
+    /**
+     * Consecutive turns where nobody did anything but throw a card away.
+     * Only reachable with [GolfOptions.lineUpFinalPutt] on, and only there to
+     * stop a table of players all declining to close from playing forever.
+     */
+    val idleDiscards: Int = 0,
     val log: List<String>,
 ) {
     fun allRevealed(seat: Int): Boolean = revealed[seat].all { it }
+
+    fun faceDownCount(seat: Int): Int = revealed[seat].count { !it }
 }
 
 @Serializable
@@ -130,3 +151,16 @@ data class ReplaceCard(val index: Int) : GolfMove
 @Serializable
 @SerialName("discard_flip")
 data class DiscardAndFlip(val index: Int) : GolfMove
+
+/**
+ * Throw the drawn card away and turn nothing over — lining up the final putt.
+ * Only offered when turning a card over would be turning over your last one.
+ */
+@Serializable
+@SerialName("discard_only")
+data object DiscardOnly : GolfMove
+
+/** Choosing one of your own cards to see before play starts. */
+@Serializable
+@SerialName("reveal")
+data class RevealCard(val index: Int) : GolfMove

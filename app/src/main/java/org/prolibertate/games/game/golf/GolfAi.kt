@@ -16,19 +16,41 @@ class GolfAi(private val difficulty: Difficulty = Difficulty.NORMAL) :
     enum class Difficulty(
         /** Take a discard worth this or less rather than gambling on the stock. */
         val discardAppetite: Int,
+        /** Only close the hole out when the visible score is at or under this. */
+        val closeOutBelow: Int,
     ) {
-        EASY(discardAppetite = 2),
-        NORMAL(discardAppetite = 5),
-        CAUTIOUS(discardAppetite = 7),
+        EASY(discardAppetite = 2, closeOutBelow = 30),
+        NORMAL(discardAppetite = 5, closeOutBelow = 16),
+        CAUTIOUS(discardAppetite = 7, closeOutBelow = 12),
     }
 
     override fun chooseMove(state: GolfState, seat: Int, legal: List<GolfMove>): GolfMove {
         require(legal.isNotEmpty()) { "No legal move for seat $seat" }
         return when (state.phase) {
+            GolfPhase.SETUP -> chooseReveal(state, seat, legal)
             GolfPhase.DRAW -> chooseDraw(state, seat, legal)
             GolfPhase.PLACE -> choosePlace(state, seat, legal)
             else -> legal.first()
         }
+    }
+
+    /**
+     * Opening reveals are spread across columns. Two cards in the same column
+     * tell you whether that column can be cancelled but nothing about the rest
+     * of the board; one in each column leaves more of the grid legible.
+     */
+    private fun chooseReveal(state: GolfState, seat: Int, legal: List<GolfMove>): GolfMove {
+        val reveals = legal.filterIsInstance<RevealCard>()
+        if (reveals.isEmpty()) return legal.first()
+        val options = state.options
+
+        val untouchedColumn = reveals.firstOrNull { move ->
+            val column = move.index % options.cols
+            (0 until options.rows).none { row ->
+                state.revealed[seat][row * options.cols + column]
+            }
+        }
+        return untouchedColumn ?: reveals.first()
     }
 
     private fun chooseDraw(state: GolfState, seat: Int, legal: List<GolfMove>): GolfMove {
@@ -59,6 +81,16 @@ class GolfAi(private val difficulty: Difficulty = Difficulty.NORMAL) :
         if (knownWorst != null) {
             val currentValue = golfValue(state.grids[seat][knownWorst.index])
             if (golfValue(drawn) < currentValue) return knownWorst
+        }
+
+        // On the last face-down card, turning it over ends the hole for
+        // everyone. Only do that from a position worth defending; otherwise
+        // line up the putt and wait for a better card.
+        if (legal.contains(DiscardOnly)) {
+            val showing = state.grids[seat].indices
+                .filter { state.revealed[seat][it] }
+                .sumOf { golfValue(state.grids[seat][it]) }
+            if (showing > difficulty.closeOutBelow) return DiscardOnly
         }
 
         // Nothing worth swapping: throw it and turn something over instead,

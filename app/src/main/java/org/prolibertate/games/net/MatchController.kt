@@ -47,6 +47,12 @@ class MatchController<S : Any, M : Any>(
      * next card lands on top of it.
      */
     private val holdBeforeNextMove: (S) -> Long = { 0L },
+    /**
+     * States that should not advance on their own — an end-of-round scoreboard
+     * the players need to read before the next deal. The controller stops and
+     * waits for [confirmAdvance].
+     */
+    private val awaitsConfirmation: (S) -> Boolean = { false },
 ) {
 
     enum class Role { HOST, CLIENT }
@@ -64,6 +70,11 @@ class MatchController<S : Any, M : Any>(
 
     private val _notice = MutableStateFlow<String?>(null)
     val notice: StateFlow<String?> = _notice.asStateFlow()
+
+    private val _awaitingConfirmation = MutableStateFlow(false)
+
+    /** True while a scoreboard is up and the table is waiting to be released. */
+    val awaitingConfirmation: StateFlow<Boolean> = _awaitingConfirmation.asStateFlow()
 
     /** Host only: the true state. Clients never see this. */
     private var authoritative: S? = null
@@ -198,6 +209,12 @@ class MatchController<S : Any, M : Any>(
             val seat = rules.currentSeat(current)
             if (seat == null) {
                 // Nobody on the clock: a hand has been scored, or the game ended.
+                if (role == Role.HOST && awaitsConfirmation(current)) {
+                    // Hold here until a player has read the scoreboard. Only the
+                    // host waits; clients simply render what they were sent.
+                    _awaitingConfirmation.value = true
+                    return
+                }
                 delay(aiThinkingMillis() * 2)
                 val advanced = advanceIdle(current)
                 if (advanced == null) {
@@ -259,6 +276,18 @@ class MatchController<S : Any, M : Any>(
                 )
             )
         }
+    }
+
+    /**
+     * Releases a table stopped on a scoreboard. A no-op anywhere else, and on a
+     * client — where the host owns the decision — it does nothing but clear the
+     * local flag.
+     */
+    fun confirmAdvance() {
+        if (!_awaitingConfirmation.value) return
+        _awaitingConfirmation.value = false
+        if (role != Role.HOST) return
+        scope.launch { driveIdleSeats() }
     }
 
     fun close() {

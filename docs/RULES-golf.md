@@ -12,11 +12,18 @@ game setup screen. Lowest score wins, as on a golf course.
   | --- | --- |
   | 4 | 2 rows of 2 |
   | 6 | 2 rows of 3 |
+  | 8 | 2 rows of 4 |
   | 9 | 3 rows of 3 |
 
-- **Seen at the start — *toggle*.** How many of your own cards you may look at
-  before play begins; two by default. They are the leftmost cards of the top
-  row, so everyone starts with the same shape of knowledge.
+- **Seen at the start — *toggle*.** How many of your own cards you turn over
+  before play begins; two by default.
+
+## Choosing your openers
+
+Nothing is dealt face up. Each player in turn picks which of their own cards to
+turn over, up to the allowance above, and play begins once everyone has chosen.
+Spreading them across columns tells you more about the board than stacking two
+in the same column.
 - One card is turned up to start the discard pile; the rest is the stock.
 - Six players on the 9-card board needs more cards than a deck holds, so two
   decks are shuffled together whenever the deal would exceed 24 cards.
@@ -31,6 +38,12 @@ Then **place** it, in one of two ways:
   there. That slot is now face up for the rest of the hole.
 - **Throw it away and turn one of your own over.** Only available for a card
   taken from the *stock* — a card picked up off the discard pile has to be used.
+- **Line up the final putt — *toggle*, off by default.** Throw the card away and
+  turn *nothing* over. Only offered when you have exactly one card left face
+  down, so it is the difference between closing the hole on a card you have not
+  chosen and waiting for something better. If every player declines for two full
+  laps the hole is called and scored where it stands, so a table cannot stall
+  forever.
 
 ## Ending a hole
 
@@ -58,6 +71,10 @@ do not — a "row" of three unrelated cards is not a line in a two-row grid.
 
 Scores accumulate over the holes — **toggle** for 3, 6 or 9 — and the lowest
 total wins.
+
+At the end of each hole a score card shows every player's strokes for that hole
+and their running total, lowest first. The next hole is not dealt until it is
+dismissed.
 
 ## Known simplifications
 

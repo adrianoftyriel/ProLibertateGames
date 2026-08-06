@@ -15,7 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,15 +34,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.prolibertate.games.game.golf.DiscardAndFlip
+import org.prolibertate.games.game.golf.DiscardOnly
 import org.prolibertate.games.game.golf.DrawFromDiscard
 import org.prolibertate.games.game.golf.DrawFromStock
 import org.prolibertate.games.game.golf.GolfMove
 import org.prolibertate.games.game.golf.GolfPhase
 import org.prolibertate.games.game.golf.GolfState
 import org.prolibertate.games.game.golf.ReplaceCard
+import org.prolibertate.games.game.golf.RevealCard
 import org.prolibertate.games.game.golf.golfValue
 import org.prolibertate.games.net.MatchController
-import org.prolibertate.games.ui.PrimaryAction
 import org.prolibertate.games.ui.ScreenScaffold
 import org.prolibertate.games.ui.common.CardBackView
 import org.prolibertate.games.ui.common.PlayingCardView
@@ -109,21 +113,16 @@ fun GolfScreen(
                             )
                         }
                     }
-                }
-
-                when (current.phase) {
-                    GolfPhase.HOLE_OVER -> Text(
-                        text = "Hole ${current.hole + 1}: " + current.holeScores
-                            .mapIndexed { seat, s -> "seat $seat $s" }.joinToString(", "),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-
-                    GolfPhase.GAME_OVER -> {
-                        Text("Game over — lowest score wins.", fontWeight = FontWeight.Bold)
-                        PrimaryAction(text = "Back to the menu") { onExit() }
+                    // Only offered on your last face-down card, and only with
+                    // the option switched on in setup.
+                    if (legal.contains(DiscardOnly)) {
+                        OutlinedButton(
+                            onClick = { controller.submit(DiscardOnly) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Line up the putt — throw it, keep the last card down")
+                        }
                     }
-
-                    else -> Unit
                 }
 
                 OwnGrid(
@@ -135,8 +134,84 @@ fun GolfScreen(
                     onMove = { controller.submit(it); mode = PlaceMode.SWAP },
                 )
             }
+
+            // The card is read before the next one is dealt, so the scoreboard
+            // is a dialog the players dismiss rather than a line that flashes by.
+            if (current.phase == GolfPhase.HOLE_OVER || current.phase == GolfPhase.GAME_OVER) {
+                ScoreCardDialog(
+                    state = current,
+                    localSeat = localSeat,
+                    onContinue = { controller.confirmAdvance() },
+                    onExit = onExit,
+                )
+            }
         }
     }
+}
+
+/**
+ * The card at the end of a hole: this hole's strokes and the running total for
+ * everyone, lowest first.
+ */
+@Composable
+private fun ScoreCardDialog(
+    state: GolfState,
+    localSeat: Int,
+    onContinue: () -> Unit,
+    onExit: () -> Unit,
+) {
+    var dismissed by remember(state.hole, state.phase) { mutableStateOf(false) }
+    if (dismissed) return
+
+    val finalHole = state.phase == GolfPhase.GAME_OVER
+    val standings = (0 until state.options.playerCount).sortedBy { state.scores[it] }
+
+    AlertDialog(
+        onDismissRequest = { },
+        title = {
+            Text(
+                if (finalHole) "Final card" else "Hole ${state.hole + 1} of ${state.options.holes}"
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text("Player", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                    Text("Hole", fontWeight = FontWeight.Bold)
+                    Text("  Total", fontWeight = FontWeight.Bold)
+                }
+                standings.forEach { seat ->
+                    val you = seat == localSeat
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = if (you) "You" else "Seat $seat",
+                            modifier = Modifier.weight(1f),
+                            fontWeight = if (you) FontWeight.Bold else FontWeight.Normal,
+                        )
+                        Text("${state.holeScores[seat]}")
+                        Text("  ${state.scores[seat]}",
+                            fontWeight = if (you) FontWeight.Bold else FontWeight.Normal)
+                    }
+                }
+                Text(
+                    text = if (finalHole) {
+                        "Lowest total wins — seat ${standings.first()} takes it."
+                    } else {
+                        "Lowest total wins."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                dismissed = true
+                if (finalHole) onExit() else onContinue()
+            }) {
+                Text(if (finalHole) "Back to the menu" else "Deal the next hole")
+            }
+        },
+    )
 }
 
 @Composable
@@ -226,10 +301,18 @@ private fun OwnGrid(
     val options = state.options
     val replacements = legal.filterIsInstance<ReplaceCard>().map { it.index }.toSet()
     val flips = legal.filterIsInstance<DiscardAndFlip>().map { it.index }.toSet()
+    val reveals = legal.filterIsInstance<RevealCard>().map { it.index }.toSet()
 
     Column {
         Text(
             text = when {
+                state.phase == GolfPhase.SETUP && reveals.isNotEmpty() -> {
+                    val left = state.options.startingReveals - state.revealed[localSeat].count { it }
+                    "Choose $left more card(s) to look at"
+                }
+
+                state.phase == GolfPhase.SETUP -> "Waiting for the others to choose…"
+
                 state.phase == GolfPhase.PLACE && mode == PlaceMode.SWAP ->
                     "Tap a card to swap it out"
 
@@ -244,9 +327,13 @@ private fun OwnGrid(
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 for (col in 0 until options.cols) {
                     val index = row * options.cols + col
-                    val tappable = when (mode) {
-                        PlaceMode.SWAP -> index in replacements
-                        PlaceMode.THROW -> index in flips
+                    val tappable = if (state.phase == GolfPhase.SETUP) {
+                        index in reveals
+                    } else {
+                        when (mode) {
+                            PlaceMode.SWAP -> index in replacements
+                            PlaceMode.THROW -> index in flips
+                        }
                     }
                     GridCard(
                         card = state.grids[localSeat].getOrNull(index),
@@ -254,9 +341,10 @@ private fun OwnGrid(
                         width = cardWidth,
                         tappable = tappable,
                         onClick = {
-                            when (mode) {
-                                PlaceMode.SWAP -> onMove(ReplaceCard(index))
-                                PlaceMode.THROW -> onMove(DiscardAndFlip(index))
+                            when {
+                                state.phase == GolfPhase.SETUP -> onMove(RevealCard(index))
+                                mode == PlaceMode.SWAP -> onMove(ReplaceCard(index))
+                                else -> onMove(DiscardAndFlip(index))
                             }
                         },
                     )
