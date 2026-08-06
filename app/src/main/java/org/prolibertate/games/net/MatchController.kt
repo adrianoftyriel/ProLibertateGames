@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -154,36 +155,45 @@ class MatchController<S : Any, M : Any>(
         check(role == Role.CLIENT) { "Not a client" }
         hostLink = link
         scope.launch {
-            link.incoming.collect { message ->
-                when (message) {
-                    is StateSync -> {
-                        // Anything off the wire is decoded defensively. This
-                        // collector runs in the screen's own scope, so throwing
-                        // here would take the app down rather than the message.
-                        val decoded = runCatching {
-                            val state = rules.decodeState(message.stateJson)
-                            state to message.legalMoves.map { rules.decodeMove(it) }
-                        }.getOrNull()
-                        if (decoded == null) {
-                            _notice.value = "The host sent something this version cannot read."
-                            return@collect
+            link.incoming
+                // Asked for from inside onSubscription, which is what makes it
+                // reliable: the request cannot leave before this collector is
+                // attached, so the reply cannot arrive before there is anything
+                // here to receive it.
+                .onSubscription { link.send(Resync) }
+                .collect { message ->
+                    when (message) {
+                        is StateSync -> {
+                            // Anything off the wire is decoded defensively. This
+                            // collector runs in the screen's own scope, so
+                            // throwing here would take the app down rather than
+                            // the message.
+                            val decoded = runCatching {
+                                val state = rules.decodeState(message.stateJson)
+                                state to message.legalMoves.map { rules.decodeMove(it) }
+                            }.getOrNull()
+                            if (decoded == null) {
+                                _notice.value =
+                                    "The host sent something this version cannot read."
+                                return@collect
+                            }
+                            _state.value = decoded.first
+                            _legalMoves.value = decoded.second
+                            _finished.value = rules.isFinished(decoded.first)
                         }
-                        _state.value = decoded.first
-                        _legalMoves.value = decoded.second
-                        _finished.value = rules.isFinished(decoded.first)
-                    }
 
-                    is Rejected -> _notice.value = message.reason
-                    is Bye -> {
-                        // The host has gone: the game cannot go on, and saying so
-                        // is what gives the screen something to offer a way out of.
-                        _legalMoves.value = emptyList()
-                        abandon("The host left the game.")
-                    }
+                        is Rejected -> _notice.value = message.reason
+                        is Bye -> {
+                            // The host has gone: the game cannot go on, and
+                            // saying so is what gives the screen something to
+                            // offer a way out of.
+                            _legalMoves.value = emptyList()
+                            abandon("The host left the game.")
+                        }
 
-                    else -> Unit
+                        else -> Unit
+                    }
                 }
-            }
         }
     }
 
@@ -214,6 +224,10 @@ class MatchController<S : Any, M : Any>(
             // nothing wrong with it — but a table that cannot go on should say so
             // rather than leave somebody waiting on a move that is not coming.
             abandon("${nameOfPeer(connection.peerId)} left the game.")
+            return
+        }
+        if (message is Resync) {
+            sendStateTo(connection)
             return
         }
         if (message !is MoveIntent) return
@@ -338,20 +352,40 @@ class MatchController<S : Any, M : Any>(
         for (slot in config.seats) {
             val peerId = slot.peerId ?: continue
             val connection = peers[peerId] ?: continue
-            val seatView = rules.viewFor(current, slot.seat)
-            val moves = if (rules.currentSeat(current) == slot.seat) {
-                rules.legalMoves(current, slot.seat).map { rules.encodeMove(it) }
-            } else {
-                emptyList()
-            }
-            connection.send(
-                StateSync(
-                    seq = sequence,
-                    yourSeat = slot.seat,
-                    stateJson = rules.encodeState(seatView),
-                    legalMoves = moves,
-                )
+            sendStateSync(connection, slot.seat, current)
+        }
+    }
+
+    /** One seat's view of [current], redacted and addressed to it. Call under [lock]. */
+    private suspend fun sendStateSync(connection: Connection, seat: Int, current: S) {
+        val moves = if (rules.currentSeat(current) == seat) {
+            rules.legalMoves(current, seat).map { rules.encodeMove(it) }
+        } else {
+            emptyList()
+        }
+        connection.send(
+            StateSync(
+                seq = sequence,
+                yourSeat = seat,
+                stateJson = rules.encodeState(rules.viewFor(current, seat)),
+                legalMoves = moves,
             )
+        )
+    }
+
+    /**
+     * Answers one peer's [Resync] with the state as it stands.
+     *
+     * Nothing to send yet means the table has not been dealt, and that is not a
+     * problem: a peer that has asked is by definition listening, so the opening
+     * publish moments later will reach it.
+     */
+    private suspend fun sendStateTo(connection: Connection) {
+        lock.withLock {
+            val current = authoritative ?: return
+            val seat = seatPeers.entries.firstOrNull { it.value == connection.peerId }?.key
+                ?: return
+            sendStateSync(connection, seat, current)
         }
     }
 
