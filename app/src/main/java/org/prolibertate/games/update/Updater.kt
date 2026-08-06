@@ -120,20 +120,25 @@ class Updater(private val activity: Activity) {
             }
 
         val assets = json.optJSONArray("assets") ?: return null
-        for (i in 0 until assets.length()) {
-            val asset = assets.getJSONObject(i)
-            val name = asset.optString("name")
-            if (name.endsWith(".apk")) {
-                return Release(
-                    tag = tag,
-                    versionCode = versionCode,
-                    apkUrl = asset.getString("browser_download_url"),
-                    apkName = name,
-                    channel = channel,
-                )
-            }
-        }
-        return null
+        val apks = (0 until assets.length())
+            .map { assets.getJSONObject(it) }
+            .filter { it.optString("name").endsWith(".apk") }
+
+        // A production release carries the same build twice: once named for its
+        // version, and once under a fixed name so a permanent download link
+        // exists. Pick the versioned one explicitly rather than whichever was
+        // uploaded first, so what gets installed is traceable to its tag.
+        val chosen = apks.firstOrNull { it.optString("name").contains(tag) }
+            ?: apks.firstOrNull()
+            ?: return null
+
+        return Release(
+            tag = tag,
+            versionCode = versionCode,
+            apkUrl = chosen.getString("browser_download_url"),
+            apkName = chosen.optString("name"),
+            channel = channel,
+        )
     }
 
     private fun openConnection(url: String): HttpURLConnection =

@@ -2,6 +2,7 @@ package org.prolibertate.games.net
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -73,9 +74,16 @@ class StreamConnection(
 
     init {
         scope.launch(Dispatchers.IO) {
+            // Told apart from a link this side closed on purpose, because only
+            // one of the two is worth telling anybody about.
+            var droppedByPeer = false
             try {
                 while (isActive && !closed.get()) {
-                    val line = reader.readLine() ?: break
+                    val line = reader.readLine()
+                    if (line == null) {
+                        droppedByPeer = true
+                        break
+                    }
                     if (line.isBlank()) continue
                     val message = runCatching {
                         protocolJson.decodeFromString<NetMessage>(line)
@@ -85,8 +93,23 @@ class StreamConnection(
             } catch (_: Exception) {
                 // A dropped link is normal: someone walked out of range or
                 // closed the app. Fall through to close().
+                droppedByPeer = true
             } finally {
+                // Safe here and nowhere else: this thread owns the reader's
+                // lock, so it is the only one that can close it without
+                // waiting. See close().
+                runCatching { reader.close() }
+                val weClosedIt = closed.get()
                 close()
+                // A link that died on its own reaches the screens on the same
+                // channel as everything else, so leaving a game is something the
+                // other end finds out about the same way it finds out about a
+                // move. Withdrawing deliberately needs no announcement, and the
+                // emit is not cancellable — the whole point of it is to arrive
+                // while everything around it is being torn down.
+                if (droppedByPeer && !weClosedIt) {
+                    withContext(NonCancellable) { runCatching { _incoming.emit(Bye) } }
+                }
             }
         }
     }
@@ -104,10 +127,24 @@ class StreamConnection(
         }
     }
 
+    /**
+     * Safe to call from any thread, including the one drawing the screen.
+     *
+     * Only the raw streams are closed here, and that is deliberate. A reader
+     * parked in [BufferedReader.readLine] holds the reader's own lock for the
+     * whole of the blocking read, and [BufferedReader.close] wants that same
+     * lock — so closing the wrapper from another thread waits for a read that
+     * only this close can end. Since the read is waiting on the socket, and the
+     * caller is usually the main thread leaving a game, that wait is the app
+     * hanging for good.
+     *
+     * Closing the underlying stream is what actually ends the read. The reader
+     * coroutine then unblocks and closes its own wrapper on its own thread. The
+     * writer needs no closing: every [send] flushes, so nothing is ever left
+     * buffered in it.
+     */
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
-        runCatching { reader.close() }
-        runCatching { writer.close() }
         runCatching { input.close() }
         runCatching { output.close() }
         onClosed(this)

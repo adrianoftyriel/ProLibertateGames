@@ -53,6 +53,11 @@ jobs:
           src="app/build/outputs/apk/debug/app-debug.apk"
           dest="ProLibertateGames-${version}.apk"
           cp "$src" "$dest"
+          # The same build again under a name that never changes. GitHub's
+          # /releases/latest/download/<name> redirect needs a constant file
+          # name, so this second copy is what makes a permanent download link
+          # possible — the versioned copy stays as the traceable one.
+          cp "$src" "ProLibertateGames.apk"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "apk=$dest" >> "$GITHUB_OUTPUT"
 
@@ -70,9 +75,14 @@ jobs:
           set -euo pipefail
           gh release create "${{ steps.stage.outputs.version }}" \
             "${{ steps.stage.outputs.apk }}" \
+            "ProLibertateGames.apk" \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
             --title "ProLibertateGames ${{ steps.stage.outputs.version }}" \
             --notes "Automated release built from \`${{ github.sha }}\` on push to \`main\`.
 
-          Download **${{ steps.stage.outputs.apk }}** below and install it on an Android device (you may need to allow *Install unknown apps*). This is a debug-signed build."
+          Download **${{ steps.stage.outputs.apk }}** below and install it on an Android device (you may need to allow *Install unknown apps*). This is a debug-signed build.
+
+          Both files below are the same build. \`ProLibertateGames.apk\` is a copy under a fixed name, so this link always fetches the newest release and can be bookmarked or shared:
+
+          https://github.com/${{ github.repository }}/releases/latest/download/ProLibertateGames.apk"
