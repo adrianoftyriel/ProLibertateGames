@@ -139,15 +139,28 @@ Both pipelines publish, to two separate channels:
 | Channel | Published by | Tag | Marked |
 | --- | --- | --- | --- |
 | Production | `release.yml`, push to `main` | `v1.0.<n>` | release |
-| Dev | `ci.yml`, push to `dev` | `v1.0.<n>-dev` | prerelease |
+| Dev | `ci.yml`, any build of `dev` | `v1.0.<n>-dev` | prerelease |
 
 Dev builds are published as **prereleases** deliberately: GitHub's "latest
 release" endpoint skips prereleases, so a production-channel install can never
 be handed a dev build even by accident. Pull requests build and check but never
 publish, so a PR from a fork cannot ship anything.
 
-`release.yml` additionally refuses to run off any branch but `main`, so a manual
-dispatch aimed elsewhere does nothing rather than shipping unreviewed code.
+**Both pipelines gate publishing on the branch rather than on what triggered
+the build**, so a manual run from the Actions tab publishes exactly as a push
+does — useful when a push cannot fire the workflow itself, which is the case
+for anything pushed by an automation token. The safety property is unchanged,
+because publishing still happens only after that same job has built, tested and
+linted clean. A pull request is still excluded without having to be named: a PR
+build runs against `refs/pull/<n>/merge`, never `refs/heads/dev`.
+
+In `ci.yml` the `PLG_CHANNEL` stamp is gated on the same condition as the
+publish steps, and the two have to stay in step. Stamping a build that then
+ships, or shipping one that was left unstamped, both end with an APK claiming
+`versionCode` 1 — which the updater can never see as an upgrade over anything.
+
+`release.yml` refuses to run off any branch but `main`, so a manual dispatch
+aimed elsewhere does nothing rather than shipping unreviewed code.
 
 **The two channels have independent version sequences** — a build's `versionCode`
 is the run number of the workflow that produced it, and the two workflows count
