@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -242,6 +244,7 @@ private fun TrickArea(state: EuchreState, localSeat: Int, cardWidth: Dp) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BiddingControls(
     state: EuchreState,
@@ -260,6 +263,8 @@ private fun BiddingControls(
     // the turn card to somebody else or to yourself.
     val youAreDealer = state.turn == state.dealer
     val upCard = state.upCard
+    val canPass = Pass in legal
+    val choices = legal.filter { it != Pass }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
@@ -282,13 +287,25 @@ private fun BiddingControls(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
+        // Stick the dealer is the one case where there is genuinely no way out,
+        // so say so rather than leaving it looking like a missing button.
+        if (!canPass) {
+            Text(
+                text = "Everyone has passed, so as dealer you must name a suit — " +
+                    "that's stick the dealer. Turn it off in game setup if you'd " +
+                    "rather the hand be thrown in.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        // Wraps rather than scrolls. A scrolling row pushed Pass off the right
+        // edge of a phone screen, which made bidding look compulsory.
+        FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            legal.forEach { move ->
+            choices.forEach { move ->
                 val label = when (move) {
-                    is Pass -> "Pass"
                     is OrderUp -> when {
                         youAreDealer && move.alone -> "Pick it up, alone"
                         youAreDealer -> "Pick it up"
@@ -301,12 +318,20 @@ private fun BiddingControls(
 
                     is Discard -> "Discard ${move.card.label}"
                     is PlayCard -> move.card.label
+                    is Pass -> "Pass"
                 }
-                if (move is Pass) {
-                    OutlinedButton(onClick = { onMove(move) }) { Text(label) }
-                } else {
-                    Button(onClick = { onMove(move) }) { Text(label) }
-                }
+                Button(onClick = { onMove(move) }) { Text(label) }
+            }
+        }
+
+        // Kept out of the wrapping group and full width so it can never be
+        // clipped, scrolled away or mistaken for one of the bids.
+        if (canPass) {
+            OutlinedButton(
+                onClick = { onMove(Pass) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Pass")
             }
         }
     }
