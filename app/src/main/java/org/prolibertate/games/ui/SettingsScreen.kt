@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Divider
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.prolibertate.games.settings.Settings
+import org.prolibertate.games.update.UpdateChannel
 import org.prolibertate.games.update.Updater
 
 @Composable
@@ -98,10 +100,43 @@ fun SettingsScreen(
 
             Text("Updates", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             Text(
-                text = "Installed: v${env.updater.installedVersionName()}. Updates come from " +
-                    "the latest release published on the project's main branch.",
+                text = "Installed: v${env.updater.installedVersionName()} " +
+                    "(${env.updater.installedChannel().label} channel).",
                 style = MaterialTheme.typography.bodySmall,
             )
+
+            Column {
+                Text("Update channel", fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    UpdateChannel.entries.forEach { channel ->
+                        FilterChip(
+                            selected = settings.updateChannel == channel,
+                            onClick = {
+                                scope.launch {
+                                    env.settingsRepository.setUpdateChannel(channel)
+                                }
+                                updateStatus = null
+                                pendingRelease = null
+                            },
+                            label = { Text(channel.label) },
+                        )
+                    }
+                }
+                Text(
+                    text = settings.updateChannel.blurb + ".",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (settings.updateChannel != env.updater.installedChannel()) {
+                    // The channels are numbered independently, so a switch can
+                    // be a downgrade as far as Android is concerned.
+                    Text(
+                        text = "You're on a ${env.updater.installedChannel().label} build. " +
+                            "Switching channels installs a different build rather than a " +
+                            "newer one — if Android refuses it, uninstall this copy first.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
 
             SettingRow(
                 title = "Check on launch",
@@ -117,16 +152,22 @@ fun SettingsScreen(
 
             PrimaryAction(text = "Check for updates now") {
                 scope.launch {
-                    updateStatus = "Checking…"
-                    when (val result = env.updater.check()) {
+                    updateStatus = "Checking the ${settings.updateChannel.label} channel…"
+                    when (val result = env.updater.check(settings.updateChannel)) {
                         is Updater.Result.UpToDate -> {
-                            updateStatus = "You're on the latest version."
+                            updateStatus =
+                                "You're on the latest ${settings.updateChannel.label} build."
                             pendingRelease = null
                         }
 
                         is Updater.Result.Available -> {
                             pendingRelease = result.release
-                            updateStatus = "Version ${result.release.tag} is available."
+                            updateStatus = if (result.isChannelSwitch) {
+                                "${result.release.tag} is the current " +
+                                    "${result.release.channel.label} build."
+                            } else {
+                                "Version ${result.release.tag} is available."
+                            }
                         }
 
                         is Updater.Result.Failed -> {

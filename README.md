@@ -48,9 +48,10 @@ them.
 - **Sound** on/off.
 - **Animation speed**, 0.5×–2×. One multiplier drives card movement and how long
   the computer appears to think.
-- **Updates** — check on launch, or check on demand. Updates are pulled from the
-  latest GitHub Release of this repository, which CI publishes on every push to
-  `main`.
+- **Updates** — check on launch, or check on demand, from either of two
+  channels:
+  - **Production** — stable builds, published from `main`.
+  - **Dev** — preview builds, published from `dev` on every green CI run.
 
 ## Screen sizes
 
@@ -78,13 +79,31 @@ Requires JDK 17 and the Android SDK (compileSdk 34).
   publishes it as a GitHub Release tagged `v1.0.<run-number>`. The in-app updater
   reads that tag, which is why the APK's `versionCode` is the same run number.
 
-**OTA updates follow `main`, and only `main`.** The updater asks GitHub for the
-latest published Release; the release workflow is the only thing that creates
-one, and it refuses to run off any branch but `main` — so a manual dispatch
-aimed at `dev` does nothing rather than shipping unreviewed code to every
-install. Only that workflow sets `PLG_RELEASE`, which is what stamps a real
-`versionCode`; dev builds stay at `1.0.0-dev` so a side-loaded CI artifact can
-never outrank a genuine release and suppress future updates.
+### Update channels
+
+Both pipelines publish, to two separate channels:
+
+| Channel | Published by | Tag | Marked |
+| --- | --- | --- | --- |
+| Production | `release.yml`, push to `main` | `v1.0.<n>` | release |
+| Dev | `ci.yml`, push to `dev` | `v1.0.<n>-dev` | prerelease |
+
+Dev builds are published as **prereleases** deliberately: GitHub's "latest
+release" endpoint skips prereleases, so a production-channel install can never
+be handed a dev build even by accident. Pull requests build and check but never
+publish, so a PR from a fork cannot ship anything.
+
+`release.yml` additionally refuses to run off any branch but `main`, so a manual
+dispatch aimed elsewhere does nothing rather than shipping unreviewed code.
+
+**The two channels have independent version sequences** — a build's `versionCode`
+is the run number of the workflow that produced it, and the two workflows count
+separately. Versions are therefore only ever compared *within* a channel; the app
+reads the `-dev` suffix in its own `versionName` to know which channel it is on,
+and treats a change of channel as an explicit switch rather than an upgrade.
+One consequence: switching channels can be a downgrade as far as Android is
+concerned, in which case the install is refused until the current copy is
+uninstalled. The settings screen says so when it applies.
 
 The debug keystore is committed on purpose: every build is signed with the same
 key, so an OTA update installs over the previous one instead of being rejected

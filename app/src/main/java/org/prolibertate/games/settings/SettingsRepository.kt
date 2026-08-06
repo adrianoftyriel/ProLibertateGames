@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.prolibertate.games.update.UpdateChannel
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -25,6 +26,8 @@ data class Settings(
     val animationSpeed: Float = 1.0f,
     val checkForUpdatesOnLaunch: Boolean = true,
     val playerName: String = "Player",
+    /** Which builds the updater offers. Production unless deliberately changed. */
+    val updateChannel: UpdateChannel = UpdateChannel.PRODUCTION,
 ) {
     /** Scales a nominal duration by the chosen speed. */
     fun scaled(millis: Long): Long =
@@ -43,6 +46,7 @@ class SettingsRepository(private val context: Context) {
         val SPEED = floatPreferencesKey("animation_speed")
         val UPDATE_ON_LAUNCH = booleanPreferencesKey("check_updates_on_launch")
         val NAME = stringPreferencesKey("player_name")
+        val CHANNEL = stringPreferencesKey("update_channel")
     }
 
     val settings: Flow<Settings> = context.dataStore.data.map { prefs ->
@@ -51,7 +55,14 @@ class SettingsRepository(private val context: Context) {
             animationSpeed = prefs[Keys.SPEED] ?: 1.0f,
             checkForUpdatesOnLaunch = prefs[Keys.UPDATE_ON_LAUNCH] ?: true,
             playerName = prefs[Keys.NAME] ?: "Player",
+            updateChannel = prefs[Keys.CHANNEL]
+                ?.let { stored -> runCatching { UpdateChannel.valueOf(stored) }.getOrNull() }
+                ?: UpdateChannel.PRODUCTION,
         )
+    }
+
+    suspend fun setUpdateChannel(channel: UpdateChannel) {
+        context.dataStore.edit { it[Keys.CHANNEL] = channel.name }
     }
 
     suspend fun setSoundEnabled(enabled: Boolean) {

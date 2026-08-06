@@ -25,10 +25,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
-      # Tells the build this is a real release, so the APK is stamped with the
-      # run number that matches the tag below. Absent everywhere else, which
-      # keeps dev and local builds at 1.0.0-dev.
-      PLG_RELEASE: "1"
+      # Stamps the APK as a production-channel build, versioned with the run
+      # number that matches the tag published below.
+      PLG_CHANNEL: production
     steps:
       - name: Checkout
         uses: actions/checkout@v4

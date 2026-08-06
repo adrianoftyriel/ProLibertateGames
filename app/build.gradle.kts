@@ -4,20 +4,17 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-// Only the release workflow stamps a real version. It sets PLG_RELEASE, and its
-// GITHUB_RUN_NUMBER is the same number as the release tag it publishes
-// (v1.0.<run-number>), so the shipped APK knows its own version and the in-app
-// updater can compare against the latest published release.
+// Which update channel this build belongs to, set by whichever workflow built
+// it: release.yml stamps "production" from main, ci.yml stamps "dev" from the
+// dev branch. Unset for a local build, which counts as dev.
 //
-// Everything else — a local build, or the dev CI pipeline — stays at 1.0.0-dev.
-// GITHUB_RUN_NUMBER alone is NOT enough to key off: it counts per workflow, so
-// the dev pipeline has its own independent sequence. A debug APK installed from
-// a CI artifact would otherwise carry that counter as its versionCode, could
-// outrank a genuine release, and would leave the updater reporting "you're on
-// the latest version" indefinitely.
-val isReleaseBuild = System.getenv("PLG_RELEASE") == "1"
-val releaseRunNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "").toIntOrNull() ?: 0
-val stampReleaseVersion = isReleaseBuild && releaseRunNumber > 0
+// GITHUB_RUN_NUMBER alone is not enough to key off, because it counts per
+// workflow — the two pipelines have entirely independent sequences. That is
+// also why versionCode is only ever compared *within* a channel; see
+// UpdateChannel for how switching between them is handled.
+val buildChannel = System.getenv("PLG_CHANNEL").orEmpty()
+val runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "").toIntOrNull() ?: 0
+val stampVersion = buildChannel.isNotEmpty() && runNumber > 0
 
 android {
     namespace = "org.prolibertate.games"
@@ -27,12 +24,14 @@ android {
         applicationId = "org.prolibertate.games"
         minSdk = 24
         targetSdk = 34
-        // Dev builds sit at 1, below every release except the very first —
-        // a v1.0.1 release ties with a dev build and so is not offered as an
-        // update. Harmless, and preferable to versionCode 0, which Android
-        // documents as out of range.
-        versionCode = if (stampReleaseVersion) releaseRunNumber else 1
-        versionName = if (stampReleaseVersion) "1.0.$releaseRunNumber" else "1.0.0-dev"
+        // The -dev suffix in versionName is what the installed app reads to
+        // know its own channel, so it must survive into the shipped APK.
+        versionCode = if (stampVersion) runNumber else 1
+        versionName = when {
+            stampVersion && buildChannel == "production" -> "1.0.$runNumber"
+            stampVersion -> "1.0.$runNumber-dev"
+            else -> "1.0.0-dev"
+        }
     }
 
     signingConfigs {
