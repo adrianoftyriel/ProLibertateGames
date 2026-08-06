@@ -72,16 +72,32 @@ fun ChessScreen(
 ) {
     val state by controller.state.collectAsState()
     val legal by controller.legalMoves.collectAsState()
+    val abandoned by controller.abandoned.collectAsState()
 
     var selected by remember { mutableStateOf<Int?>(null) }
     // A pawn reaching the last rank is one tap that stands for four moves, so
     // the destination is held while the piece is chosen.
     var promotionTo by remember { mutableStateOf<Int?>(null) }
+    // A game with nobody left to play it, or one being walked away from, both end
+    // through a dialog rather than by silently dropping off the screen.
+    var confirmingEnd by remember { mutableStateOf(false) }
+
+    val endGameAction: @Composable () -> Unit = {
+        TextButton(onClick = { confirmingEnd = true }) { Text("End game") }
+    }
 
     val current = state
     if (current == null) {
-        ScreenScaffold(title = "Chess", onBack = onExit) { modifier ->
+        ScreenScaffold(title = "Chess", onBack = onExit, actions = endGameAction) { modifier ->
             Box(modifier, contentAlignment = Alignment.Center) { Text("Setting up…") }
+            // A table that never arrives — a host that went away mid-handshake —
+            // still has to be leavable.
+            abandoned?.let {
+                LeftTheTableDialog(it, onExit = onExit, onStay = controller::dismissAbandoned)
+            }
+            if (confirmingEnd) {
+                ConfirmEndDialog(onEnd = onExit, onKeepPlaying = { confirmingEnd = false })
+            }
         }
         return
     }
@@ -104,7 +120,7 @@ fun ChessScreen(
         }
     }
 
-    ScreenScaffold(title = "Chess", onBack = onExit) { modifier ->
+    ScreenScaffold(title = "Chess", onBack = onExit, actions = endGameAction) { modifier ->
         BoxWithConstraints(modifier = modifier) {
             val wide = maxWidth > maxHeight
             val boardSide = if (wide) {
@@ -152,10 +168,21 @@ fun ChessScreen(
                 }
             }
 
-            promotionTo?.let { destination ->
-                PromotionDialog(
+            // One dialog at a time, most pressing first. A game nobody can finish
+            // comes before the result of one that finished, and before a
+            // half-made promotion: there is no point choosing a piece for a move
+            // that has nowhere left to go.
+            val over = abandoned
+            when {
+                over != null ->
+                    LeftTheTableDialog(over, onExit = onExit, onStay = controller::dismissAbandoned)
+
+                confirmingEnd ->
+                    ConfirmEndDialog(onEnd = onExit, onKeepPlaying = { confirmingEnd = false })
+
+                promotionTo != null -> PromotionDialog(
                     white = current.whiteToMove,
-                    choices = fromSelected.filter { it.to == destination },
+                    choices = fromSelected.filter { it.to == promotionTo },
                     onPick = {
                         controller.submit(it)
                         promotionTo = null
@@ -163,13 +190,46 @@ fun ChessScreen(
                     },
                     onDismiss = { promotionTo = null },
                 )
-            }
 
-            if (current.phase == ChessPhase.GAME_OVER) {
-                ResultDialog(current, onExit)
+                current.phase == ChessPhase.GAME_OVER -> ResultDialog(current, onExit)
             }
         }
     }
+}
+
+/**
+ * Leaving a game on purpose.
+ *
+ * Chess is the one game here that a player wants out of before the position is
+ * settled: a card hand is over in minutes, whereas a game of chess between two
+ * people who are no longer enjoying it has no natural end at all.
+ */
+@Composable
+private fun ConfirmEndDialog(onEnd: () -> Unit, onKeepPlaying: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onKeepPlaying,
+        title = { Text("End this game?") },
+        text = {
+            Text(
+                "This game ends here and the position is not saved. Anyone else " +
+                    "at the table is told you have left."
+            )
+        },
+        confirmButton = { TextButton(onClick = onEnd) { Text("End the game") } },
+        dismissButton = { TextButton(onClick = onKeepPlaying) { Text("Keep playing") } },
+    )
+}
+
+/** The other end has gone, so no further move is ever going to arrive. */
+@Composable
+private fun LeftTheTableDialog(notice: String, onExit: () -> Unit, onStay: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onStay,
+        title = { Text("The game has ended") },
+        text = { Text("$notice There are no more moves to play.") },
+        confirmButton = { TextButton(onClick = onExit) { Text("Leave the game") } },
+        dismissButton = { TextButton(onClick = onStay) { Text("Look at the board") } },
+    )
 }
 
 @Composable
@@ -372,7 +432,7 @@ private fun ResultDialog(state: ChessState, onExit: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onExit) { Text("Back to the menu") } },
+        confirmButton = { TextButton(onClick = onExit) { Text("Leave the game") } },
         dismissButton = { TextButton(onClick = { dismissed = true }) { Text("Look at the board") } },
     )
 }
