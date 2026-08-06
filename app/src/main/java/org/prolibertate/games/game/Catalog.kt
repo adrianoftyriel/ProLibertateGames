@@ -58,7 +58,7 @@ object GameCatalog {
             maxPlayers = 4,
             teamBased = true,
             blurb = "Prairie trick-taking with bidding. The 5 of hearts and 3 of spades decide it.",
-            available = false,
+            available = true,
         ),
         GameDescriptor(
             id = PRESIDENT,
@@ -88,7 +88,7 @@ object GameCatalog {
             maxPlayers = 6,
             teamBased = false,
             blurb = "Bid your tricks exactly. Wizards always win, jesters always lose.",
-            available = false,
+            available = true,
         ),
         GameDescriptor(
             id = CRAZY_EIGHTS,
@@ -98,7 +98,7 @@ object GameCatalog {
             maxPlayers = 6,
             teamBased = false,
             blurb = "Match rank or suit, and eights change everything.",
-            available = false,
+            available = true,
         ),
         GameDescriptor(
             id = SEQUENCE,
@@ -138,7 +138,7 @@ object GameCatalog {
             maxPlayers = 2,
             teamBased = false,
             blurb = "The old game. Full legal moves, castling, en passant, promotion.",
-            available = false,
+            available = true,
         ),
         GameDescriptor(
             id = CHECKERS,

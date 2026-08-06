@@ -30,12 +30,20 @@ import org.prolibertate.games.game.GameDescriptor
 import org.prolibertate.games.game.engine.PlayerKind
 import org.prolibertate.games.game.engine.PlayerSlot
 import org.prolibertate.games.game.engine.TableConfig
+import org.prolibertate.games.game.chess.ChessLevel
+import org.prolibertate.games.game.chess.ChessOptions
+import org.prolibertate.games.game.crazyeights.CrazyEightsOptions
 import org.prolibertate.games.game.euchre.EuchreOptions
 import org.prolibertate.games.game.golf.GolfOptions
+import org.prolibertate.games.game.kaiser.KaiserOptions
 import org.prolibertate.games.game.president.PresidentOptions
 import org.prolibertate.games.game.sequence.SequenceOptions
+import org.prolibertate.games.game.wizard.WizardOptions
 
-private val setupJson = Json { encodeDefaults = true }
+private val setupJson = Json {
+    encodeDefaults = true
+    ignoreUnknownKeys = true
+}
 
 /**
  * Choose who is playing and which house rules apply.
@@ -48,28 +56,33 @@ fun GameSetupScreen(
     descriptor: GameDescriptor,
     playerName: String,
     onBack: () -> Unit,
-    onPlayOffline: (TableConfig) -> Unit,
+    onPlayOffline: (TableConfig, Int) -> Unit,
     onHostOnline: (String) -> Unit,
 ) {
     var euchre by remember { mutableStateOf(EuchreOptions()) }
     var sequence by remember { mutableStateOf(SequenceOptions()) }
     var president by remember { mutableStateOf(PresidentOptions()) }
     var golf by remember { mutableStateOf(GolfOptions()) }
+    var kaiser by remember { mutableStateOf(KaiserOptions()) }
+    var crazyEights by remember { mutableStateOf(CrazyEightsOptions()) }
+    var wizard by remember { mutableStateOf(WizardOptions()) }
+    var chess by remember { mutableStateOf(ChessOptions()) }
+    // Not an engine option: which seat the local player takes. Seat 0 is
+    // always White, so choosing Black means sitting in seat 1.
+    var playWhite by remember { mutableStateOf(true) }
 
     val optionsJson = when (descriptor.id) {
         GameCatalog.EUCHRE -> setupJson.encodeToString(euchre)
         GameCatalog.SEQUENCE -> setupJson.encodeToString(sequence)
         GameCatalog.PRESIDENT -> setupJson.encodeToString(president)
         GameCatalog.GOLF -> setupJson.encodeToString(golf)
+        GameCatalog.KAISER -> setupJson.encodeToString(kaiser)
+        GameCatalog.CRAZY_EIGHTS -> setupJson.encodeToString(crazyEights)
+        GameCatalog.WIZARD -> setupJson.encodeToString(wizard)
+        GameCatalog.CHESS -> setupJson.encodeToString(chess)
         else -> "{}"
     }
-    val seatCount = when (descriptor.id) {
-        GameCatalog.EUCHRE -> 4
-        GameCatalog.SEQUENCE -> sequence.playerCount
-        GameCatalog.PRESIDENT -> president.playerCount
-        GameCatalog.GOLF -> golf.playerCount
-        else -> descriptor.minPlayers
-    }
+    val seatCount = seatCountFor(descriptor.id, optionsJson)
 
     ScreenScaffold(title = descriptor.title, onBack = onBack) { modifier ->
         Column(
@@ -86,6 +99,19 @@ fun GameSetupScreen(
                 GameCatalog.SEQUENCE -> SequenceOptionsEditor(sequence) { sequence = it }
                 GameCatalog.PRESIDENT -> PresidentOptionsEditor(president) { president = it }
                 GameCatalog.GOLF -> GolfOptionsEditor(golf) { golf = it }
+                GameCatalog.KAISER -> KaiserOptionsEditor(kaiser) { kaiser = it }
+                GameCatalog.CRAZY_EIGHTS -> CrazyEightsOptionsEditor(crazyEights) {
+                    crazyEights = it
+                }
+
+                GameCatalog.WIZARD -> WizardOptionsEditor(wizard) { wizard = it }
+                GameCatalog.CHESS -> ChessOptionsEditor(
+                    options = chess,
+                    playWhite = playWhite,
+                    onChange = { chess = it },
+                    onColour = { playWhite = it },
+                )
+
                 else -> Text("No options yet for this game.")
             }
 
@@ -98,9 +124,13 @@ fun GameSetupScreen(
                 style = MaterialTheme.typography.bodySmall,
             )
 
+            // Chess is the only game so far where the local player picks a
+            // seat rather than always taking the first one.
+            val localSeat = if (descriptor.id == GameCatalog.CHESS && !playWhite) 1 else 0
             PrimaryAction(text = "Play against the computer") {
                 onPlayOffline(
-                    offlineConfig(descriptor.id, optionsJson, seatCount, playerName)
+                    offlineConfig(descriptor.id, optionsJson, seatCount, playerName, localSeat),
+                    localSeat,
                 )
             }
             PrimaryAction(text = "Host a game for others to join") {
@@ -110,19 +140,20 @@ fun GameSetupScreen(
     }
 }
 
-/** Seat 0 is the local player; the rest start as AI. */
+/** [localSeat] is the person at this device; every other seat starts as AI. */
 private fun offlineConfig(
     gameId: String,
     optionsJson: String,
     seatCount: Int,
     playerName: String,
+    localSeat: Int = 0,
 ): TableConfig = TableConfig(
     gameId = gameId,
     seats = (0 until seatCount).map { seat ->
         PlayerSlot(
             seat = seat,
-            name = if (seat == 0) playerName else "Computer $seat",
-            kind = if (seat == 0) PlayerKind.HUMAN_LOCAL else PlayerKind.AI,
+            name = if (seat == localSeat) playerName else "Computer $seat",
+            kind = if (seat == localSeat) PlayerKind.HUMAN_LOCAL else PlayerKind.AI,
             team = teamForSeat(gameId, seat),
         )
     },
@@ -131,9 +162,42 @@ private fun offlineConfig(
     seed = System.currentTimeMillis(),
 )
 
+/**
+ * How many seats a table needs, read back out of the options the host chose.
+ *
+ * The lobby only carries the options as JSON, so this is the one place that
+ * knows a six-handed Wizard game needs six seats rather than the catalogue's
+ * minimum — seat the wrong number and the rules engine rejects the table.
+ */
+fun seatCountFor(gameId: String, optionsJson: String): Int {
+    val fallback = GameCatalog.byId(gameId)?.minPlayers ?: 2
+    return runCatching {
+        when (gameId) {
+            GameCatalog.EUCHRE, GameCatalog.KAISER -> 4
+            GameCatalog.SEQUENCE ->
+                setupJson.decodeFromString<SequenceOptions>(optionsJson).playerCount
+
+            GameCatalog.PRESIDENT ->
+                setupJson.decodeFromString<PresidentOptions>(optionsJson).playerCount
+
+            GameCatalog.GOLF ->
+                setupJson.decodeFromString<GolfOptions>(optionsJson).playerCount
+
+            GameCatalog.CRAZY_EIGHTS ->
+                setupJson.decodeFromString<CrazyEightsOptions>(optionsJson).playerCount
+
+            GameCatalog.WIZARD ->
+                setupJson.decodeFromString<WizardOptions>(optionsJson).playerCount
+
+            GameCatalog.CHESS -> 2
+            else -> fallback
+        }
+    }.getOrDefault(fallback)
+}
+
 fun teamForSeat(gameId: String, seat: Int): Int = when (gameId) {
     // Partners sit opposite each other.
-    GameCatalog.EUCHRE, GameCatalog.SEQUENCE -> seat % 2
+    GameCatalog.EUCHRE, GameCatalog.KAISER, GameCatalog.SEQUENCE -> seat % 2
     // Everyone else plays for themselves.
     else -> seat
 }
@@ -300,6 +364,155 @@ private fun GolfOptionsEditor(options: GolfOptions, onChange: (GolfOptions) -> U
         Text(
             text = "${options.rows} rows of ${options.cols}. Matching columns cancel out" +
                 if (options.gridSize == 9) ", and so do matching rows." else ".",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun KaiserOptionsEditor(options: KaiserOptions, onChange: (KaiserOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Lowest opening bid",
+            values = listOf(5, 6, 7, 8),
+            selected = options.minimumBid,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(minimumBid = it)) },
+        )
+        ChipRow(
+            label = "Game to",
+            values = listOf(32, 52, 62),
+            selected = options.pointsToWin,
+            display = { "$it points" },
+            onSelect = { target ->
+                // The floor moves with the target: a long game needs a long
+                // rope before a team that keeps going down is written off.
+                onChange(options.copy(pointsToWin = target, losingScore = -target))
+            },
+        )
+        ToggleRow(
+            title = "No-trump bids",
+            subtitle = "Pays double, and costs double when it goes down",
+            checked = options.allowNoTrump,
+            onChange = { onChange(options.copy(allowNoTrump = it)) },
+        )
+        Text(
+            text = "Four players in two partnerships. The 5♥ is worth five and the 3♠ " +
+                "costs three, so a hand is worth ten points in all.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun CrazyEightsOptionsEditor(
+    options: CrazyEightsOptions,
+    onChange: (CrazyEightsOptions) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Players",
+            values = listOf(2, 3, 4, 5, 6),
+            selected = options.playerCount,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(playerCount = it)) },
+        )
+        ChipRow(
+            label = "Cards each",
+            values = listOf(0, 5, 7, 9),
+            selected = options.startingHand,
+            display = { if (it == 0) "standard" else "$it" },
+            onSelect = { onChange(options.copy(startingHand = it)) },
+        )
+        ChipRow(
+            label = "Rounds",
+            values = listOf(1, 3, 5),
+            selected = options.roundsToPlay,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(roundsToPlay = it)) },
+        )
+        ToggleRow(
+            title = "Draw until you can play",
+            subtitle = "Otherwise you draw a single card and the turn passes on",
+            checked = options.drawUntilPlayable,
+            onChange = { onChange(options.copy(drawUntilPlayable = it)) },
+        )
+        Text(
+            text = "Standard is seven cards heads-up and five otherwise. Eights are wild " +
+                "and cost fifty if you are caught holding one.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun WizardOptionsEditor(options: WizardOptions, onChange: (WizardOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Players",
+            values = listOf(3, 4, 5, 6),
+            selected = options.playerCount,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(playerCount = it)) },
+        )
+        ChipRow(
+            label = "Rounds",
+            values = listOf(0, 5, 10),
+            selected = options.rounds,
+            display = { if (it == 0) "full game" else "$it" },
+            onSelect = { onChange(options.copy(rounds = it)) },
+        )
+        ToggleRow(
+            title = "Screw the dealer",
+            subtitle = "The dealer may not make the bids add up, so somebody always misses",
+            checked = options.screwTheDealer,
+            onChange = { onChange(options.copy(screwTheDealer = it)) },
+        )
+        Text(
+            text = "A full game deals the whole sixty-card pack out: " +
+                "${options.totalRounds()} rounds at this table.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun ChessOptionsEditor(
+    options: ChessOptions,
+    playWhite: Boolean,
+    onChange: (ChessOptions) -> Unit,
+    onColour: (Boolean) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "You play",
+            values = listOf(true, false),
+            selected = playWhite,
+            display = { if (it) "White" else "Black" },
+            onSelect = onColour,
+        )
+        ChipRow(
+            label = "Opponent",
+            values = ChessLevel.entries.toList(),
+            selected = options.level,
+            display = { it.label },
+            onSelect = { onChange(options.copy(level = it)) },
+        )
+        ToggleRow(
+            title = "Fifty-move rule",
+            subtitle = "Fifty moves each with no capture and no pawn move is a draw",
+            checked = options.fiftyMoveRule,
+            onChange = { onChange(options.copy(fiftyMoveRule = it)) },
+        )
+        ToggleRow(
+            title = "Threefold repetition",
+            subtitle = "The same position three times over is a draw",
+            checked = options.threefoldRepetition,
+            onChange = { onChange(options.copy(threefoldRepetition = it)) },
+        )
+        Text(
+            text = "Full rules: castling, en passant, promotion, stalemate, and a draw " +
+                "when neither side has enough material to mate.",
             style = MaterialTheme.typography.bodySmall,
         )
     }

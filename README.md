@@ -5,12 +5,12 @@ or against other people over Wi-Fi (LAN) or Bluetooth.
 
 ## What works today
 
-The app shell is complete and four games are playable end to end:
+The app shell is complete and eight games are playable end to end:
 
 | | |
 | --- | --- |
-| **Playable** | Euchre, Sequence, President, Golf |
-| **Listed, not yet implemented** | Kaiser, Wizard, Crazy 8s, Mastermind, Backgammon, Chess, Checkers |
+| **Playable** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s, Sequence, Chess |
+| **Listed, not yet implemented** | Mastermind, Backgammon, Checkers |
 
 Unimplemented games appear in the menu marked *Coming soon* **on dev builds
 only** — a production release lists just the games that can actually be played,
@@ -148,8 +148,12 @@ game:
 
 - [Euchre](docs/RULES-euchre.md)
 - [Sequence](docs/RULES-sequence.md) — **note the caveat about the board layout**
+- [Kaiser](docs/RULES-kaiser.md)
 - [President](docs/RULES-president.md)
 - [Golf](docs/RULES-golf.md)
+- [Wizard](docs/RULES-wizard.md)
+- [Crazy 8s](docs/RULES-crazy8s.md)
+- [Chess](docs/RULES-chess.md)
 
 ## Layout
 
@@ -158,9 +162,13 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
   cards/       deck, suits, ranks
   engine/      GameRules / GameAi contracts, seats, table config
   euchre/      Euchre model, rules, AI
+  kaiser/      Kaiser model, bidding, rules, AI
   sequence/    Sequence model, board, rules, AI
   president/   President model, rules, AI
   golf/        Golf model, scoring, rules, AI
+  wizard/      Wizard model, rules, AI
+  crazyeights/ Crazy 8s model, rules, AI
+  chess/       Chess model, FEN, move generation, search
 net/           wire protocol, LAN and Bluetooth transports, lobby, match driver
 settings/      DataStore-backed preferences
 update/        GitHub Releases OTA updater

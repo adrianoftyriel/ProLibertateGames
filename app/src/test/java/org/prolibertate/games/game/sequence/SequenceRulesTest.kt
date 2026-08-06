@@ -64,7 +64,7 @@ class SequenceRulesTest {
     @Test
     fun `every non-jack card maps to exactly two squares`() {
         val nonJacks = Suit.entries.flatMap { suit ->
-            Rank.entries.filter { it != Rank.JACK }.map { Card(it, suit) }
+            Rank.standard.filter { it != Rank.JACK }.map { Card(it, suit) }
         }
         nonJacks.forEach { card ->
             assertEquals("$card", 2, SequenceBoard.squaresByCard[card]?.size)

@@ -1,7 +1,9 @@
 package org.prolibertate.games.net
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -231,17 +233,24 @@ class MatchController<S : Any, M : Any>(
             if (seatKinds[seat] != PlayerKind.AI) return // a person's turn
 
             delay(holdBeforeNextMove(current) + aiThinkingMillis())
-            val chosen = lock.withLock {
+
+            val legal = rules.legalMoves(current, seat)
+            if (legal.isEmpty()) return
+            // Off the caller's thread. A card AI answers instantly, but a chess
+            // search runs for a second or more, and this scope belongs to the
+            // screen — thinking here would freeze the board it is drawn on.
+            val move = withContext(Dispatchers.Default) { ai.chooseMove(current, seat, legal) }
+
+            val applied = lock.withLock {
                 val live = authoritative ?: return
-                if (rules.currentSeat(live) != seat) return@withLock null
-                val legal = rules.legalMoves(live, seat)
-                if (legal.isEmpty()) return@withLock null
-                val move = ai.chooseMove(live, seat, legal)
+                // Nothing else can move while an AI seat is on the clock, but
+                // the state is re-read rather than assumed.
+                if (rules.currentSeat(live) != seat) return@withLock false
                 authoritative = rules.applyMove(live, seat, move)
                 publish()
-                move
+                true
             }
-            if (chosen == null) return
+            if (!applied) return
         }
     }
 

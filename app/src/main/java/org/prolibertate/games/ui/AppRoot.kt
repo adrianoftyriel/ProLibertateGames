@@ -146,7 +146,7 @@ private fun AppContent(
             descriptor = GameCatalog.byId(route.gameId)!!,
             playerName = settings.displayName,
             onBack = { pop() },
-            onPlayOffline = { config -> push(Route.Play(route.gameId, config, true, 0)) },
+            onPlayOffline = { config, seat -> push(Route.Play(route.gameId, config, true, seat)) },
             onHostOnline = { optionsJson ->
                 push(Route.Lobby(route.gameId, optionsJson, hosting = true))
             },

@@ -21,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import org.prolibertate.games.game.GameCatalog
 import org.prolibertate.games.game.engine.PlayerKind
 import org.prolibertate.games.game.engine.TableConfig
 import org.prolibertate.games.net.DiscoveredHost
@@ -46,10 +45,9 @@ fun LobbyScreen(
     LaunchedEffect(route) {
         env.requestBluetoothPermissions()
         if (route.hosting) {
-            val descriptor = GameCatalog.byId(route.gameId)
-            val seatCount = descriptor?.let {
-                if (it.id == GameCatalog.EUCHRE) 4 else it.minPlayers
-            } ?: 4
+            // Seat the table the host actually set up, not the catalogue
+            // minimum: the rules engine rejects a table of the wrong size.
+            val seatCount = seatCountFor(route.gameId, route.optionsJson)
             env.lobby.startHosting(
                 gameId = route.gameId,
                 optionsJson = route.optionsJson,

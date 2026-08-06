@@ -19,8 +19,14 @@ enum class Suit(val symbol: String, val isRed: Boolean) {
     }
 }
 
+/**
+ * [standard] marks the fifty-two cards every ordinary deck holds. The two
+ * extras belong to Wizard alone, so anything building a normal deck must filter
+ * on this rather than walking the whole enum — otherwise every other game
+ * quietly gains eight cards it has no rules for.
+ */
 @Serializable
-enum class Rank(val short: String, val order: Int) {
+enum class Rank(val short: String, val order: Int, val standard: Boolean = true) {
     TWO("2", 2),
     THREE("3", 3),
     FOUR("4", 4),
@@ -34,6 +40,18 @@ enum class Rank(val short: String, val order: Int) {
     QUEEN("Q", 12),
     KING("K", 13),
     ACE("A", 14),
+
+    /** Wizard only: beats everything, including trump. */
+    WIZARD("Wz", 100, standard = false),
+
+    /** Wizard only: loses to everything, and leads no suit. */
+    JESTER("Je", 0, standard = false),
+    ;
+
+    companion object {
+        /** The thirteen ranks of an ordinary deck. */
+        val standard: List<Rank> get() = entries.filter { it.standard }
+    }
 }
 
 @Serializable
@@ -61,7 +79,7 @@ object Decks {
 
     /** Standard 52-card deck. */
     fun standard52(): List<Card> =
-        Suit.entries.flatMap { suit -> Rank.entries.map { rank -> Card(rank, suit) } }
+        Suit.entries.flatMap { suit -> Rank.standard.map { rank -> Card(rank, suit) } }
 
     /**
      * Euchre decks. 24 cards (9 through ace) is the common game; 32 cards
@@ -74,12 +92,38 @@ object Decks {
             else -> throw IllegalArgumentException("Unsupported Euchre deck size: $size")
         }
         return Suit.entries.flatMap { suit ->
-            Rank.entries.filter { it.order >= lowest.order }.map { rank -> Card(rank, suit) }
+            Rank.standard.filter { it.order >= lowest.order }.map { rank -> Card(rank, suit) }
         }
     }
 
+    /**
+     * The 60-card Wizard deck: an ordinary pack plus four wizards and four
+     * jesters, one of each per suit so they fit the same card model.
+     */
+    fun wizard(): List<Card> = standard52() +
+        Suit.entries.map { Card(Rank.WIZARD, it) } +
+        Suit.entries.map { Card(Rank.JESTER, it) }
+
     /** Two full decks shuffled together, as Sequence uses. */
     fun double52(): List<Card> = standard52() + standard52()
+
+    /**
+     * The 32-card Kaiser deck: eight to ace in every suit, plus the seven of
+     * clubs and the seven of diamonds — and, in place of the other two sevens,
+     * the five of hearts and the three of spades, which are what the whole game
+     * is played for.
+     */
+    fun kaiser(): List<Card> {
+        val high = Suit.entries.flatMap { suit ->
+            Rank.standard.filter { it.order >= Rank.EIGHT.order }.map { Card(it, suit) }
+        }
+        return high + listOf(
+            Card(Rank.SEVEN, Suit.CLUBS),
+            Card(Rank.SEVEN, Suit.DIAMONDS),
+            Card(Rank.FIVE, Suit.HEARTS),
+            Card(Rank.THREE, Suit.SPADES),
+        )
+    }
 }
 
 /**

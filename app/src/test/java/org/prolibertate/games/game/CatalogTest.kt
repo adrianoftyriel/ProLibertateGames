@@ -55,6 +55,10 @@ class CatalogTest {
                 GameCatalog.SEQUENCE,
                 GameCatalog.PRESIDENT,
                 GameCatalog.GOLF,
+                GameCatalog.KAISER,
+                GameCatalog.CRAZY_EIGHTS,
+                GameCatalog.WIZARD,
+                GameCatalog.CHESS,
             ),
             GameCatalog.playable.map { it.id }.toSet(),
         )
