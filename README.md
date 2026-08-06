@@ -70,14 +70,15 @@ drawable, so it stays sharp at every density and needs no PNGs.
 
 Two honest caveats:
 
-- **The sett is matched by eye, not to a registered threadcount.**
-  `WallaceSett` is written as a half-sett and reflected about its pivots, the way
-  a threadcount is published: gold 6, black 6, red 36, black 24, red 36, black 6.
-  That gives a red ground at about two thirds, black bands alternating wide and
-  narrow, and one thin gold overstripe per repeat flanked by black — matched
-  against a reference swatch rather than to the Scottish Register of Tartans.
-  Substituting registered counts is an edit to that one list; the icon is
-  generated from the same numbers, so both follow.
+- **The sett is the published threadcount: `K/4 R32 K32 Y/4`.** The slashes are
+  pivots, so `WallaceSett` holds the half-sett and reflects it out to
+  `K4 R32 K32 Y4 K32 R32` — 136 threads, about half black, half red, with a
+  yellow line worth 3%. Two details define the pattern and are easy to get
+  backwards: the yellow overstripe runs down the *centre of a wide black band*,
+  and the narrow black guard sits *between two red blocks*. The icon is
+  generated from the same numbers, so the icon and the splash cannot drift.
+  Weave scale is derived from the sett rather than fixed, so changing the
+  threadcount rescales both instead of silently zooming in.
 - **The typeface is bundled under a licence.** Uncial Antiqua, © 2011 Brian J.
   Bonislawsky DBA Astigmatic, Reserved Font Name "Uncial Antiqua", used under
   the SIL Open Font License 1.1. The full licence is at

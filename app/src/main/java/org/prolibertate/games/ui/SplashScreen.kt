@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import org.prolibertate.games.R
 import org.prolibertate.games.ui.theme.TartanBackground
+import org.prolibertate.games.ui.theme.threadWidthFor
 
 /** How long the splash holds at full opacity before fading. */
 private const val SPLASH_HOLD_MILLIS = 2_000L
@@ -75,9 +76,10 @@ fun SplashScreen(
         // longer in scope.
         val shortestSide = minOf(maxWidth, maxHeight).value
 
-        // Weave scale follows the screen so the cloth reads the same on a phone
-        // and a tablet rather than turning into a fine grid on a large display.
-        val threadWidth = (shortestSide * 0.012f).dp
+        // Weave scale is derived from the sett, not a fixed fraction, so a
+        // couple of full repeats are always on screen whatever the threadcount
+        // says and whatever the display is.
+        val threadWidth = threadWidthFor(across = shortestSide.dp, repeats = 2f)
         val titleSize = (shortestSide * 0.13f).sp
         TartanBackground(
             modifier = Modifier.fillMaxSize(),
