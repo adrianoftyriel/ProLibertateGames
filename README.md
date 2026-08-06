@@ -57,6 +57,31 @@ them.
   - **Production** — stable builds, published from `main`.
   - **Dev** — preview builds, published from `dev` on every green CI run.
 
+## Branding
+
+The launcher icon is a single square of the Wallace tartan, and the app opens on
+a tartan splash carrying the name in a Celtic uncial hand for two seconds before
+fading into the menu.
+
+The tartan is drawn, not an image: `ui/theme/Tartan.kt` lays the sett down as
+warp and then as weft at half opacity, which is what produces the blended
+squares instead of a flat grid. The icon is the same construction as a vector
+drawable, so it stays sharp at every density and needs no PNGs.
+
+Two honest caveats:
+
+- **The sett is an approximation.** `WallaceSett` reproduces what the Wallace
+  tartan reads as — a bold red and black check divided by a narrow gold
+  overstripe — but the registered threadcount could not be verified, so the
+  numbers were chosen to look right rather than to be authoritative. They are
+  plain data; replacing them with the registered counts rebrands the whole app
+  and needs no other change.
+- **The typeface is bundled under a licence.** Uncial Antiqua, © 2011 Brian J.
+  Bonislawsky DBA Astigmatic, Reserved Font Name "Uncial Antiqua", used under
+  the SIL Open Font License 1.1. The full licence is at
+  [docs/licenses/UncialAntiqua-OFL.txt](docs/licenses/UncialAntiqua-OFL.txt) and
+  must stay with the font — the OFL requires it to be distributed alongside.
+
 ## Screen sizes
 
 There are no fixed orientations or hard-coded card sizes. Layouts measure the

@@ -82,11 +82,9 @@ fun AppRoot(env: AppEnv) {
         env.updater.installedChannel() == UpdateChannel.DEV
     }
 
-    fun push(route: Route) {
-        stack = stack + route
-    }
+    val push: (Route) -> Unit = { route -> stack = stack + route }
 
-    fun pop() {
+    val pop: () -> Unit = {
         if (stack.size > 1) {
             // Leaving a lobby or a table tears the networking down with it.
             when (stack.last()) {
@@ -99,6 +97,35 @@ fun AppRoot(env: AppEnv) {
 
     BackHandler(enabled = stack.size > 1) { pop() }
 
+    var splashDone by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AppContent(
+            env = env,
+            settings = settings,
+            stack = stack,
+            showComingSoon = showComingSoon,
+            push = push,
+            pop = pop,
+        )
+
+        // Over the top, so the menu behind it is already composed when it fades.
+        if (!splashDone) {
+            SplashScreen(onFinished = { splashDone = true })
+        }
+    }
+}
+
+/** The navigation stack proper, kept separate so the splash can sit over it. */
+@Composable
+private fun AppContent(
+    env: AppEnv,
+    settings: Settings,
+    stack: List<Route>,
+    showComingSoon: Boolean,
+    push: (Route) -> Unit,
+    pop: () -> Unit,
+) {
     when (val route = stack.last()) {
         is Route.Menu -> MainMenuScreen(
             // Dev builds show the games that are not finished yet; production

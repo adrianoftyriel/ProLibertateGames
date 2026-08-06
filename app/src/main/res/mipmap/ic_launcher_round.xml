@@ -1,17 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Fallback round launcher icon for API < 26. -->
+<!-- Fallback launcher icon for API < 26, which has no adaptive-icon support.
+     Same Wallace tartan swatch as drawable/ic_launcher_background.xml, drawn
+     at icon scale so one full sett repeat fills the tile. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#2E7D32"
-        android:pathData="M54,54m-54,0a54,54 0,1 1,108 0a54,54 0,1 1,-108 0" />
-    <path
-        android:fillColor="#111111"
-        android:pathData="M54,54m-26,0a26,26 0,1 1,52 0a26,26 0,1 1,-52 0" />
-    <path
-        android:fillColor="#000000"
-        android:pathData="M54,54m-20,0a20,20 0,1 1,40 0a20,20 0,1 1,-40 0" />
+    android:viewportWidth="84"
+    android:viewportHeight="84">
+
+    <path android:fillColor="#111111" android:pathData="M0,0h84v84h-84z" />
+
+    <!-- Warp -->
+    <path android:fillColor="#B3121B" android:pathData="M0,0h40v84h-40z" />
+    <path android:fillColor="#F2C200" android:pathData="M80,0h4v84h-4z" />
+
+    <!-- Weft -->
+    <path android:fillColor="#B3121B" android:fillAlpha="0.5" android:pathData="M0,0h84v40h-84z" />
+    <path android:fillColor="#111111" android:fillAlpha="0.5" android:pathData="M0,40h84v40h-84z" />
+    <path android:fillColor="#F2C200" android:fillAlpha="0.5" android:pathData="M0,80h84v4h-84z" />
 </vector>
