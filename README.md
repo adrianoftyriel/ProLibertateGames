@@ -5,12 +5,12 @@ or against other people over Wi-Fi (LAN) or Bluetooth.
 
 ## What works today
 
-The app shell is complete and two games are playable end to end:
+The app shell is complete and four games are playable end to end:
 
 | | |
 | --- | --- |
-| **Playable** | Euchre, Sequence |
-| **Listed, not yet implemented** | Kaiser, President, Golf, Wizard, Crazy 8s, Mastermind, Backgammon, Chess, Checkers |
+| **Playable** | Euchre, Sequence, President, Golf |
+| **Listed, not yet implemented** | Kaiser, Wizard, Crazy 8s, Mastermind, Backgammon, Chess, Checkers |
 
 Unimplemented games appear in the menu marked *Coming soon* **on dev builds
 only** — a production release lists just the games that can actually be played,
@@ -59,9 +59,9 @@ them.
 
 ## Branding
 
-The launcher icon is a single square of the Wallace tartan, and the app opens on
-a tartan splash carrying the name in a Celtic uncial hand for two seconds before
-fading into the menu.
+The launcher icon is a single square of the Wallace tartan set on the bias, and
+the app opens on the same cloth carrying the name in a Celtic uncial hand for two
+seconds before fading into the menu.
 
 The tartan is drawn, not an image: `ui/theme/Tartan.kt` lays the sett down as
 warp and then as weft at half opacity, which is what produces the blended
@@ -70,12 +70,15 @@ drawable, so it stays sharp at every density and needs no PNGs.
 
 Two honest caveats:
 
-- **The sett is an approximation.** `WallaceSett` reproduces what the Wallace
-  tartan reads as — a bold red and black check divided by a narrow gold
-  overstripe — but the registered threadcount could not be verified, so the
-  numbers were chosen to look right rather than to be authoritative. They are
-  plain data; replacing them with the registered counts rebrands the whole app
-  and needs no other change.
+- **The sett is the published threadcount: `K/4 R32 K32 Y/4`.** The slashes are
+  pivots, so `WallaceSett` holds the half-sett and reflects it out to
+  `K4 R32 K32 Y4 K32 R32` — 136 threads, about half black, half red, with a
+  yellow line worth 3%. Two details define the pattern and are easy to get
+  backwards: the yellow overstripe runs down the *centre of a wide black band*,
+  and the narrow black guard sits *between two red blocks*. The icon is
+  generated from the same numbers, so the icon and the splash cannot drift.
+  Weave scale is derived from the sett rather than fixed, so changing the
+  threadcount rescales both instead of silently zooming in.
 - **The typeface is bundled under a licence.** Uncial Antiqua, © 2011 Brian J.
   Bonislawsky DBA Astigmatic, Reserved Font Name "Uncial Antiqua", used under
   the SIL Open Font License 1.1. The full licence is at
@@ -145,6 +148,8 @@ game:
 
 - [Euchre](docs/RULES-euchre.md)
 - [Sequence](docs/RULES-sequence.md) — **note the caveat about the board layout**
+- [President](docs/RULES-president.md)
+- [Golf](docs/RULES-golf.md)
 
 ## Layout
 
@@ -154,6 +159,8 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
   engine/      GameRules / GameAi contracts, seats, table config
   euchre/      Euchre model, rules, AI
   sequence/    Sequence model, board, rules, AI
+  president/   President model, rules, AI
+  golf/        Golf model, scoring, rules, AI
 net/           wire protocol, LAN and Bluetooth transports, lobby, match driver
 settings/      DataStore-backed preferences
 update/        GitHub Releases OTA updater
