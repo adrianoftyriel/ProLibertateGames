@@ -51,11 +51,19 @@ them.
   - **Production** — stable builds, published from `main`.
   - **Dev** — preview builds, published from `dev` on every green CI run.
 
+  The two install as separate apps, so both can be kept on one device — see
+  [Both channels on one device](#both-channels-on-one-device).
+
 ## Branding
 
 The launcher icon is a single square of the Wallace tartan set on the bias, and
 the app opens on the same cloth carrying the name in a Celtic uncial hand for two
 seconds before fading into the menu.
+
+A dev build wears **Wallace Hunting** instead — the same threadcount with green
+where the clan sett has red — and installs as *Pro Libertate Games DEV*. That is
+what tells the two copies apart when both are on the phone; see
+[Both channels on one device](#both-channels-on-one-device).
 
 The tartan is drawn, not an image: `ui/theme/Tartan.kt` lays the sett down as
 warp and then as weft at half opacity, which is what produces the blended
@@ -72,7 +80,9 @@ Two honest caveats:
   and the narrow black guard sits *between two red blocks*. The icon is
   generated from the same numbers, so the icon and the splash cannot drift.
   Weave scale is derived from the sett rather than fixed, so changing the
-  threadcount rescales both instead of silently zooming in.
+  threadcount rescales both instead of silently zooming in. The hunting
+  colourway is the same threadcount passed a different field colour, not a
+  second copy of the numbers, so it cannot fall out of step either.
 - **The typeface is bundled under a licence.** Uncial Antiqua, © 2011 Brian J.
   Bonislawsky DBA Astigmatic, Reserved Font Name "Uncial Antiqua", used under
   the SIL Open Font License 1.1. The full licence is at
@@ -100,6 +110,11 @@ smaller than a fingertip.
 ```
 
 Requires JDK 17 and the Android SDK (compileSdk 34).
+
+A local build is a dev build: it installs as `org.prolibertate.games.dev` under
+the name *Pro Libertate Games DEV* in the hunting sett, so it goes on beside an
+installed release rather than over it. Set `PLG_CHANNEL=production` to build the
+production package instead.
 
 ## CI
 
@@ -161,9 +176,39 @@ is the run number of the workflow that produced it, and the two workflows count
 separately. Versions are therefore only ever compared *within* a channel; the app
 reads the `-dev` suffix in its own `versionName` to know which channel it is on,
 and treats a change of channel as an explicit switch rather than an upgrade.
-One consequence: switching channels can be a downgrade as far as Android is
-concerned, in which case the install is refused until the current copy is
-uninstalled. The settings screen says so when it applies.
+
+### Both channels on one device
+
+A dev build installs under its own `applicationId`, `org.prolibertate.games.dev`,
+so it is a separate app as far as Android is concerned and can sit beside the
+production copy rather than replacing it. Each channel still updates itself
+normally, because an update within a channel keeps the same package.
+
+Three things move together, all off `isDevBuild` in `app/build.gradle.kts`:
+
+| | Production | Dev |
+| --- | --- | --- |
+| `applicationId` | `org.prolibertate.games` | `org.prolibertate.games.dev` |
+| Launcher name | Pro Libertate Games | Pro Libertate Games DEV |
+| Sett | Wallace (red) | Wallace Hunting (green) |
+
+Anything that is not an explicit `PLG_CHANNEL=production` build is a dev build,
+so a local `assembleDebug` is a dev build too and installs alongside a release
+without uninstalling anything.
+
+They have to move together. A dev package wearing the production name and
+colours is precisely the mix-up that having both installed is meant to prevent,
+which is why one flag drives all three rather than each being set by hand. The
+name and the colours reach the resources through `resValue`, so `app_name`,
+`tartan_field`, `splash_background` and `ic_launcher_background` are generated
+by the build and are deliberately *not* in `res/values/` — the icon vectors
+reference `@color/tartan_field` rather than a literal, which is how one set of
+vectors serves both colourways. `BuildConfig.DEV_BUILD` carries the same flag
+into Kotlin, where `AppSett` picks the matching Compose sett for the splash.
+
+Switching channels in Settings therefore installs the other channel's app
+alongside this one and leaves this one in place; the settings screen says so
+when the selected channel is not the installed one.
 
 The debug keystore is committed on purpose: every build is signed with the same
 key, so an OTA update installs over the previous one instead of being rejected

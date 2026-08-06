@@ -30,8 +30,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import org.prolibertate.games.R
 import org.prolibertate.games.game.GameCatalog
 import org.prolibertate.games.game.GameCategory
 import org.prolibertate.games.game.GameDescriptor
@@ -196,7 +198,9 @@ fun MainMenuScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pro Libertate Games") },
+                // The installed name rather than a literal, so a dev build says
+                // so in its own title bar as well as in the app drawer.
+                title = { Text(stringResource(R.string.app_name)) },
                 actions = { TextButton(onClick = onSettings) { Text("Settings") } },
             )
         }
