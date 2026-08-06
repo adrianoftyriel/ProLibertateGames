@@ -38,6 +38,7 @@ object GameCatalog {
     const val BACKGAMMON = "backgammon"
     const val CHESS = "chess"
     const val CHECKERS = "checkers"
+    const val TAYU = "tayu"
 
     val all: List<GameDescriptor> = listOf(
         GameDescriptor(
@@ -148,6 +149,18 @@ object GameCatalog {
             maxPlayers = 2,
             teamBased = false,
             blurb = "Forced captures, kings, and the long diagonal.",
+            available = false,
+        ),
+        GameDescriptor(
+            id = TAYU,
+            title = "Ta Yü",
+            category = GameCategory.BOARD,
+            minPlayers = 2,
+            maxPlayers = 4,
+            // Two play solo, four play in partnerships across the two axes.
+            teamBased = true,
+            blurb = "Lay river tiles out from the centre. Reach both your edges, " +
+                "because your score multiplies them.",
             available = false,
         ),
     )

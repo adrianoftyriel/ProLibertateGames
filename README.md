@@ -10,7 +10,7 @@ The app shell is complete and eight games are playable end to end:
 | | |
 | --- | --- |
 | **Playable** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s, Sequence, Chess |
-| **Listed, not yet implemented** | Mastermind, Backgammon, Checkers |
+| **Listed, not yet implemented** | Mastermind, Backgammon, Checkers, Ta Yü |
 
 Unimplemented games appear in the menu marked *Coming soon* **on dev builds
 only** — a production release lists just the games that can actually be played,
@@ -170,6 +170,9 @@ game:
 - [Wizard](docs/RULES-wizard.md)
 - [Crazy 8s](docs/RULES-crazy8s.md)
 - [Chess](docs/RULES-chess.md)
+- [Ta Yü](docs/RULES-tayu.md) — **not implemented yet**: this one is the
+  specification the engine will be written against, and it says which parts of
+  the out-of-print rulebook had to be reconstructed
 
 ## Layout
 
