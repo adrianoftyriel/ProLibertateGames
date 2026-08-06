@@ -36,7 +36,11 @@ fun SettingsScreen(
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    var name by remember(settings.playerName) { mutableStateOf(settings.playerName) }
+    // Null until the user touches the field, at which point their text takes
+    // over for good. Keying this off the stored name instead meant every
+    // keystroke re-seeded the field from what had just been written, so the
+    // caret jumped and a cleared field refilled itself.
+    var editedName by remember { mutableStateOf<String?>(null) }
     var updateStatus by remember { mutableStateOf<String?>(null) }
     var pendingRelease by remember { mutableStateOf<Updater.Release?>(null) }
 
@@ -86,14 +90,22 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                 )
                 OutlinedTextField(
-                    value = name,
+                    value = editedName ?: settings.playerName,
                     onValueChange = { entered ->
-                        name = entered
+                        editedName = entered
                         scope.launch { env.settingsRepository.setPlayerName(entered) }
                     },
+                    placeholder = { Text(Settings.DEFAULT_PLAYER_NAME) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )
+                if ((editedName ?: settings.playerName).isBlank()) {
+                    Text(
+                        text = "Leave it empty and you'll show up as " +
+                            "${Settings.DEFAULT_PLAYER_NAME}.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
 
             Divider()

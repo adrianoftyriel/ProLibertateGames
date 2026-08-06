@@ -107,7 +107,7 @@ fun AppRoot(env: AppEnv) {
 
         is Route.Setup -> GameSetupScreen(
             descriptor = GameCatalog.byId(route.gameId)!!,
-            playerName = settings.playerName,
+            playerName = settings.displayName,
             onBack = { pop() },
             onPlayOffline = { config -> push(Route.Play(route.gameId, config, true, 0)) },
             onHostOnline = { optionsJson ->
@@ -118,7 +118,7 @@ fun AppRoot(env: AppEnv) {
         is Route.Lobby -> LobbyScreen(
             env = env,
             route = route,
-            playerName = settings.playerName,
+            playerName = settings.displayName,
             onBack = { pop() },
             onStart = { config, hosting, seat ->
                 push(Route.Play(config.gameId, config, hosting, seat))

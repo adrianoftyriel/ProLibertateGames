@@ -25,10 +25,23 @@ data class Settings(
     val soundEnabled: Boolean = true,
     val animationSpeed: Float = 1.0f,
     val checkForUpdatesOnLaunch: Boolean = true,
-    val playerName: String = "Player",
+    /**
+     * Exactly what the user has typed, which may be blank while they are
+     * mid-edit. Nothing substitutes a default into this value: doing so meant
+     * that clearing the field wrote "Player" straight back and the text
+     * snapped back before a real name could be typed.
+     */
+    val playerName: String = "",
     /** Which builds the updater offers. Production unless deliberately changed. */
     val updateChannel: UpdateChannel = UpdateChannel.PRODUCTION,
 ) {
+    /**
+     * The name other players actually see. This is where the default lives, so
+     * an empty field is a display concern rather than something written back
+     * into what the user is typing.
+     */
+    val displayName: String get() = playerName.trim().ifBlank { DEFAULT_PLAYER_NAME }
+
     /** Scales a nominal duration by the chosen speed. */
     fun scaled(millis: Long): Long =
         (millis / animationSpeed.coerceIn(MIN_SPEED, MAX_SPEED)).toLong()
@@ -36,6 +49,7 @@ data class Settings(
     companion object {
         const val MIN_SPEED = 0.5f
         const val MAX_SPEED = 2.0f
+        const val DEFAULT_PLAYER_NAME = "Player"
     }
 }
 
@@ -54,7 +68,7 @@ class SettingsRepository(private val context: Context) {
             soundEnabled = prefs[Keys.SOUND] ?: true,
             animationSpeed = prefs[Keys.SPEED] ?: 1.0f,
             checkForUpdatesOnLaunch = prefs[Keys.UPDATE_ON_LAUNCH] ?: true,
-            playerName = prefs[Keys.NAME] ?: "Player",
+            playerName = prefs[Keys.NAME] ?: "",
             updateChannel = prefs[Keys.CHANNEL]
                 ?.let { stored -> runCatching { UpdateChannel.valueOf(stored) }.getOrNull() }
                 ?: UpdateChannel.PRODUCTION,
@@ -79,7 +93,8 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { it[Keys.UPDATE_ON_LAUNCH] = enabled }
     }
 
+    /** Stores the name verbatim. The fallback belongs to [Settings.displayName]. */
     suspend fun setPlayerName(name: String) {
-        context.dataStore.edit { it[Keys.NAME] = name.trim().ifBlank { "Player" } }
+        context.dataStore.edit { it[Keys.NAME] = name }
     }
 }
