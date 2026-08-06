@@ -70,9 +70,15 @@ fun SplashScreen(
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize().alpha(alpha)) {
+        // Read the constraints here and hold them in locals: inside Column the
+        // implicit receiver becomes ColumnScope, and maxWidth/maxHeight are no
+        // longer in scope.
+        val shortestSide = minOf(maxWidth, maxHeight).value
+
         // Weave scale follows the screen so the cloth reads the same on a phone
         // and a tablet rather than turning into a fine grid on a large display.
-        val threadWidth = (minOf(maxWidth, maxHeight).value * 0.012f).dp
+        val threadWidth = (shortestSide * 0.012f).dp
+        val titleSize = (shortestSide * 0.13f).sp
         TartanBackground(
             modifier = Modifier.fillMaxSize(),
             threadWidth = threadWidth,
@@ -96,7 +102,7 @@ fun SplashScreen(
                 text = "Pro Libertate",
                 style = TextStyle(
                     fontFamily = CelticFontFamily,
-                    fontSize = (minOf(maxWidth, maxHeight).value * 0.13f).sp,
+                    fontSize = titleSize,
                     color = Color(0xFFF7EFD8),
                     textAlign = TextAlign.Center,
                     shadow = Shadow(
@@ -110,7 +116,7 @@ fun SplashScreen(
                 text = "Games",
                 style = TextStyle(
                     fontFamily = CelticFontFamily,
-                    fontSize = (minOf(maxWidth, maxHeight).value * 0.13f).sp,
+                    fontSize = titleSize,
                     color = Color(0xFFF2C200),
                     textAlign = TextAlign.Center,
                     shadow = Shadow(
