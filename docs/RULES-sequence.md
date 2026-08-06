@@ -53,6 +53,11 @@ Play one card and place a chip on a matching empty square, then draw.
 - **Two-eyed jacks** (♦ and ♣) are wild: place a chip on any empty square.
 - **One-eyed jacks** (♥ and ♠) remove one opposing chip — but never a chip that
   is part of a completed sequence, and never your own team's chip.
+
+On a physical deck the difference is carried by the artwork: a jack drawn in
+profile shows one eye, a jack drawn face-on shows two. These cards are drawn as
+rank and suit only, so a jack in hand is captioned **WILD** or **REMOVE**
+instead.
 - **Dead card — *toggle*, on by default.** If both squares printed with your card
   are already occupied, you may discard it and draw a replacement. This does not
   cost your turn, and you may do it once per turn.

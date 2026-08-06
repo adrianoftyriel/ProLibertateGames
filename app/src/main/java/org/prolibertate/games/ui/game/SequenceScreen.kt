@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import org.prolibertate.games.game.cards.Card
 import org.prolibertate.games.game.sequence.BOARD_SIZE
 import org.prolibertate.games.game.sequence.ExchangeDeadCard
+import org.prolibertate.games.game.sequence.isOneEyedJack
+import org.prolibertate.games.game.sequence.isTwoEyedJack
 import org.prolibertate.games.game.sequence.NO_TEAM
 import org.prolibertate.games.game.sequence.PlaceChip
 import org.prolibertate.games.game.sequence.RemoveChip
@@ -53,6 +55,17 @@ import org.prolibertate.games.ui.theme.TeamColours
  * board in either light or dark mode.
  */
 private val HighlightAmber = Color(0xFFFFC107)
+
+/**
+ * What a jack does, printed on its face. On a real deck this is carried by the
+ * artwork — a jack shown in profile has one eye and removes a chip, one shown
+ * face-on has two and is wild — which a rank-and-suit card cannot convey.
+ */
+private fun jackCaption(card: Card): String? = when {
+    isTwoEyedJack(card) -> "WILD"
+    isOneEyedJack(card) -> "REMOVE"
+    else -> null
+}
 
 /**
  * The Sequence board.
@@ -294,6 +307,9 @@ private fun HandStrip(
                     width = cardWidth,
                     selected = card == selected,
                     enabled = card in playable,
+                    // A jack's power comes from its artwork, which these cards
+                    // do not have, so spell it out on the face instead.
+                    caption = jackCaption(card),
                     onClick = {
                         val dead = exchanges[card]
                         if (dead != null) onExchange(dead) else onSelect(card)
@@ -301,9 +317,18 @@ private fun HandStrip(
                 )
             }
         }
-        selected?.let {
+        selected?.let { card ->
             Text(
-                text = "Tap a highlighted square to play ${it.label}.",
+                text = when {
+                    isTwoEyedJack(card) ->
+                        "${card.label} is wild — tap any empty square."
+
+                    isOneEyedJack(card) ->
+                        "${card.label} removes a chip — tap an opponent's, " +
+                            "as long as it isn't part of a finished sequence."
+
+                    else -> "Tap a highlighted square to play ${card.label}."
+                },
                 style = MaterialTheme.typography.bodySmall,
             )
         }

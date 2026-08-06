@@ -41,6 +41,12 @@ fun PlayingCardView(
     width: Dp = 64.dp,
     selected: Boolean = false,
     enabled: Boolean = true,
+    /**
+     * Short note printed on the face, for when the rank and suit alone do not
+     * say what the card does — a Sequence jack being the obvious case, since
+     * one-eyed and two-eyed jacks are only distinguishable by their artwork.
+     */
+    caption: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val ink = if (card.suit.isRed) CardRed else CardBlack
@@ -61,6 +67,8 @@ fun PlayingCardView(
             ),
         contentAlignment = Alignment.Center,
     ) {
+        // Shrink the pips slightly when a caption has to share the face.
+        val pipScale = if (caption == null) 0.34f else 0.28f
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
@@ -69,13 +77,22 @@ fun PlayingCardView(
                 text = card.rank.short,
                 color = ink,
                 fontWeight = FontWeight.Bold,
-                fontSize = (width.value * 0.34f).sp,
+                fontSize = (width.value * pipScale).sp,
             )
             Text(
                 text = card.suit.symbol,
                 color = ink,
-                fontSize = (width.value * 0.34f).sp,
+                fontSize = (width.value * pipScale).sp,
             )
+            if (caption != null) {
+                Text(
+                    text = caption,
+                    color = ink,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (width.value * 0.145f).sp,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
