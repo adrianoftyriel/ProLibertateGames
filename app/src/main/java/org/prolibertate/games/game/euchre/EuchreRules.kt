@@ -277,6 +277,7 @@ object EuchreRules : GameRules<EuchreState, EuchreMove> {
             leader = leader,
             turn = leader,
             trick = emptyList(),
+            completedTrick = emptyList(),
             passes = 0,
         )
     }
@@ -285,7 +286,8 @@ object EuchreRules : GameRules<EuchreState, EuchreMove> {
         val hands = state.hands.toMutableList()
         hands[seat] = hands[seat] - card
         val trick = state.trick + PlayedCard(seat, card)
-        val played = state.copy(hands = hands, trick = trick)
+        // Playing to a new trick sweeps the previous one off the table.
+        val played = state.copy(hands = hands, trick = trick, completedTrick = emptyList())
 
         if (trick.size < state.activeSeatCount) {
             return played.copy(turn = nextActive(state, seat))
@@ -300,6 +302,9 @@ object EuchreRules : GameRules<EuchreState, EuchreMove> {
 
         val afterTrick = played.copy(
             trick = emptyList(),
+            // Held so the finished trick can be seen before it is cleared away,
+            // rather than the fourth card vanishing the instant it lands.
+            completedTrick = trick,
             tricksWon = tricksWon,
             leader = winner,
             turn = winner,

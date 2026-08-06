@@ -19,6 +19,7 @@ import org.prolibertate.games.game.sequence.SequenceState
 import org.prolibertate.games.net.MatchController
 import org.prolibertate.games.settings.Settings
 import org.prolibertate.games.ui.game.EuchreScreen
+import org.prolibertate.games.ui.game.TRICK_HOLD_MILLIS
 import org.prolibertate.games.ui.game.SequenceScreen
 
 /**
@@ -58,10 +59,24 @@ fun PlayScreen(
                         }
                     },
                     aiThinkingMillis = { settings.scaled(700L) },
+                    // Keep the finished trick on the table before the next
+                    // card lands on top of it.
+                    holdBeforeNextMove = { state ->
+                        if (state.completedTrick.isNotEmpty()) {
+                            settings.scaled(TRICK_HOLD_MILLIS)
+                        } else {
+                            0L
+                        }
+                    },
                 )
             }
             StartMatch(env, controller, route)
-            EuchreScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+            EuchreScreen(
+                controller = controller,
+                localSeat = route.localSeat,
+                trickHoldMillis = settings.scaled(TRICK_HOLD_MILLIS),
+                onExit = onExit,
+            )
         }
 
         GameCatalog.SEQUENCE -> {

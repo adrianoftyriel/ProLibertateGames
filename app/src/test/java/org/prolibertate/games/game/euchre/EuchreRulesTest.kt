@@ -304,6 +304,45 @@ class EuchreRulesTest {
         assertEquals(0, finished.scores[0])
     }
 
+    // -- Completed tricks ---------------------------------------------------
+
+    @Test
+    fun `a finished trick stays on the table until the next card is played`() {
+        val trump = Suit.SPADES
+        val hands = listOf(
+            listOf(Card(Rank.ACE, Suit.SPADES), Card(Rank.NINE, Suit.HEARTS)),
+            listOf(Card(Rank.NINE, Suit.SPADES), Card(Rank.TEN, Suit.HEARTS)),
+            listOf(Card(Rank.TEN, Suit.SPADES), Card(Rank.QUEEN, Suit.HEARTS)),
+            listOf(Card(Rank.QUEEN, Suit.SPADES), Card(Rank.KING, Suit.HEARTS)),
+        )
+        var state = playingState(hands = hands, trump = trump)
+
+        // Play a full trick.
+        repeat(4) {
+            val seat = EuchreRules.currentSeat(state)!!
+            state = EuchreRules.applyMove(state, seat, PlayCard(state.hands[seat].first()))
+        }
+
+        assertTrue("the live trick is cleared", state.trick.isEmpty())
+        assertEquals("all four cards are held for display", 4, state.completedTrick.size)
+        assertEquals("seat 0 played the ace of trump", 0, state.lastTrickWinner)
+
+        // The next card played sweeps it away.
+        val next = EuchreRules.currentSeat(state)!!
+        state = EuchreRules.applyMove(state, next, PlayCard(state.hands[next].first()))
+        assertTrue("held trick is cleared once play resumes", state.completedTrick.isEmpty())
+    }
+
+    @Test
+    fun `a fresh hand starts with nothing held on the table`() {
+        var state = EuchreRules.initialState(config())
+        assertTrue(state.completedTrick.isEmpty())
+        state = EuchreRules.applyMove(state, state.turn, OrderUp(alone = false))
+        val discard = EuchreRules.legalMoves(state, state.dealer).first() as Discard
+        state = EuchreRules.applyMove(state, state.dealer, discard)
+        assertTrue("play begins with a clear table", state.completedTrick.isEmpty())
+    }
+
     // -- Full games ---------------------------------------------------------
 
     @Test

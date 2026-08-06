@@ -41,6 +41,12 @@ class MatchController<S : Any, M : Any>(
     private val advanceIdle: (S) -> S? = { null },
     /** Scaled by the animation-speed setting so the table paces itself. */
     private val aiThinkingMillis: () -> Long = { 700L },
+    /**
+     * Extra pause before the next move is made, given the current state. Lets a
+     * game hold a finished trick on the table long enough to be read before the
+     * next card lands on top of it.
+     */
+    private val holdBeforeNextMove: (S) -> Long = { 0L },
 ) {
 
     enum class Role { HOST, CLIENT }
@@ -207,7 +213,7 @@ class MatchController<S : Any, M : Any>(
 
             if (seatKinds[seat] != PlayerKind.AI) return // a person's turn
 
-            delay(aiThinkingMillis())
+            delay(holdBeforeNextMove(current) + aiThinkingMillis())
             val chosen = lock.withLock {
                 val live = authoritative ?: return
                 if (rules.currentSeat(live) != seat) return@withLock null
