@@ -16,14 +16,20 @@ import org.prolibertate.games.game.engine.GameAi
 class EuchreAi(private val difficulty: Difficulty = Difficulty.NORMAL) :
     GameAi<EuchreState, EuchreMove> {
 
+    /**
+     * Thresholds are calibrated against the score an average five-card hand
+     * earns from [handValue], which sits around 11. A threshold near that mean
+     * means every seat bids and the card is never turned down — see
+     * EuchreBiddingRateTest, which pins the resulting order-up rate.
+     */
     enum class Difficulty(val bidThreshold: Int, val aloneThreshold: Int) {
         /** Bids loosely and plays straightforwardly. */
-        EASY(bidThreshold = 7, aloneThreshold = 26),
+        EASY(bidThreshold = 21, aloneThreshold = 32),
 
-        NORMAL(bidThreshold = 9, aloneThreshold = 24),
+        NORMAL(bidThreshold = 24, aloneThreshold = 32),
 
         /** Bids tighter and is harder to sneak a trick past. */
-        CAUTIOUS(bidThreshold = 11, aloneThreshold = 22),
+        CAUTIOUS(bidThreshold = 27, aloneThreshold = 31),
     }
 
     override fun chooseMove(state: EuchreState, seat: Int, legal: List<EuchreMove>): EuchreMove {
@@ -47,19 +53,25 @@ class EuchreAi(private val difficulty: Difficulty = Difficulty.NORMAL) :
      */
     private fun handValue(hand: List<Card>, trump: Suit): Int {
         var value = 0
+        var trumpCount = 0
         for (card in hand) {
             value += when {
-                isRightBower(card, trump) -> 9
-                isLeftBower(card, trump) -> 7
-                isTrumpCard(card, trump) -> 3 + (card.rank.order - Rank.NINE.order) / 2
+                isRightBower(card, trump) -> 10
+                isLeftBower(card, trump) -> 8
+                isTrumpCard(card, trump) -> 4 + (card.rank.order - Rank.NINE.order) / 2
                 card.rank == Rank.ACE -> 3
                 card.rank == Rank.KING -> 1
                 else -> 0
             }
+            if (isTrumpCard(card, trump)) trumpCount++
         }
-        // A void in a side suit means an early chance to trump in.
-        val sideSuits = Suit.entries.filter { it != trump }
-        value += sideSuits.count { suit -> hand.none { effectiveSuit(it, trump) == suit } } * 2
+        // A void is a chance to trump in — but only while there is trump left
+        // to do it with. Counting voids on a trumpless hand was inflating
+        // exactly the weak hands that should be passing.
+        if (trumpCount >= 2) {
+            val sideSuits = Suit.entries.filter { it != trump }
+            value += sideSuits.count { suit -> hand.none { effectiveSuit(it, trump) == suit } } * 2
+        }
         return value
     }
 

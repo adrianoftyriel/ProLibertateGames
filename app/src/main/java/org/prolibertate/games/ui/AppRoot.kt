@@ -39,6 +39,7 @@ import org.prolibertate.games.game.engine.TableConfig
 import org.prolibertate.games.net.LobbyController
 import org.prolibertate.games.settings.Settings
 import org.prolibertate.games.settings.SettingsRepository
+import org.prolibertate.games.update.UpdateChannel
 import org.prolibertate.games.update.Updater
 
 /** Everything the screens need, assembled once by the activity. */
@@ -75,11 +76,15 @@ fun AppRoot(env: AppEnv) {
     val settings by env.settingsRepository.settings.collectAsState(initial = Settings())
     var stack by remember { mutableStateOf(listOf<Route>(Route.Menu)) }
 
-    fun push(route: Route) {
-        stack = stack + route
+    // Read from the installed APK's own version name, so this follows the build
+    // rather than the channel the user has selected for future updates.
+    val showComingSoon = remember {
+        env.updater.installedChannel() == UpdateChannel.DEV
     }
 
-    fun pop() {
+    val push: (Route) -> Unit = { route -> stack = stack + route }
+
+    val pop: () -> Unit = {
         if (stack.size > 1) {
             // Leaving a lobby or a table tears the networking down with it.
             when (stack.last()) {
@@ -92,8 +97,40 @@ fun AppRoot(env: AppEnv) {
 
     BackHandler(enabled = stack.size > 1) { pop() }
 
+    var splashDone by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AppContent(
+            env = env,
+            settings = settings,
+            stack = stack,
+            showComingSoon = showComingSoon,
+            push = push,
+            pop = pop,
+        )
+
+        // Over the top, so the menu behind it is already composed when it fades.
+        if (!splashDone) {
+            SplashScreen(onFinished = { splashDone = true })
+        }
+    }
+}
+
+/** The navigation stack proper, kept separate so the splash can sit over it. */
+@Composable
+private fun AppContent(
+    env: AppEnv,
+    settings: Settings,
+    stack: List<Route>,
+    showComingSoon: Boolean,
+    push: (Route) -> Unit,
+    pop: () -> Unit,
+) {
     when (val route = stack.last()) {
         is Route.Menu -> MainMenuScreen(
+            // Dev builds show the games that are not finished yet; production
+            // releases list only what can actually be played.
+            showComingSoon = showComingSoon,
             onPickGame = { push(Route.Setup(it.id)) },
             onJoinGame = { push(Route.Lobby(gameId = "", optionsJson = "{}", hosting = false)) },
             onSettings = { push(Route.Settings) },
@@ -107,7 +144,7 @@ fun AppRoot(env: AppEnv) {
 
         is Route.Setup -> GameSetupScreen(
             descriptor = GameCatalog.byId(route.gameId)!!,
-            playerName = settings.playerName,
+            playerName = settings.displayName,
             onBack = { pop() },
             onPlayOffline = { config -> push(Route.Play(route.gameId, config, true, 0)) },
             onHostOnline = { optionsJson ->
@@ -118,7 +155,7 @@ fun AppRoot(env: AppEnv) {
         is Route.Lobby -> LobbyScreen(
             env = env,
             route = route,
-            playerName = settings.playerName,
+            playerName = settings.displayName,
             onBack = { pop() },
             onStart = { config, hosting, seat ->
                 push(Route.Play(config.gameId, config, hosting, seat))
@@ -141,6 +178,7 @@ fun AppRoot(env: AppEnv) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainMenuScreen(
+    showComingSoon: Boolean,
     onPickGame: (GameDescriptor) -> Unit,
     onJoinGame: () -> Unit,
     onSettings: () -> Unit,
@@ -175,6 +213,10 @@ fun MainMenuScreen(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 GameCategory.entries.forEach { category ->
+                    val games = GameCatalog.byCategory(category, includeComingSoon = showComingSoon)
+                    // Don't leave a heading stranded over nothing.
+                    if (games.isEmpty()) return@forEach
+
                     item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
                         Text(
                             text = category.label,
@@ -183,7 +225,7 @@ fun MainMenuScreen(
                             modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
                         )
                     }
-                    items(GameCatalog.byCategory(category)) { game ->
+                    items(games) { game ->
                         GameTile(game = game, onClick = { onPickGame(game) })
                     }
                 }

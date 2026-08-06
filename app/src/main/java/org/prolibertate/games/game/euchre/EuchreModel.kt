@@ -70,6 +70,12 @@ data class EuchreState(
     val turn: Int,
     val passes: Int,
     val trick: List<PlayedCard>,
+    /**
+     * The trick that has just been won, kept on the table so it can be read and
+     * then animated away. Cleared as soon as the next card is played. Winner is
+     * [lastTrickWinner].
+     */
+    val completedTrick: List<PlayedCard> = emptyList(),
     val leader: Int,
     val tricksWon: List<Int>,
     /** Two entries: team 0 is seats 0 and 2, team 1 is seats 1 and 3. */

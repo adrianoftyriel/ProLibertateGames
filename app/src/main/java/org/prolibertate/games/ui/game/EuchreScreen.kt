@@ -1,13 +1,18 @@
 package org.prolibertate.games.ui.game
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -18,13 +23,22 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 import org.prolibertate.games.game.euchre.CallTrump
 import org.prolibertate.games.game.euchre.Discard
 import org.prolibertate.games.game.euchre.EuchreMove
@@ -51,6 +65,7 @@ import org.prolibertate.games.ui.theme.FeltGreenDark
 fun EuchreScreen(
     controller: MatchController<EuchreState, EuchreMove>,
     localSeat: Int,
+    trickHoldMillis: Long,
     onExit: () -> Unit,
 ) {
     val state by controller.state.collectAsState()
@@ -84,7 +99,7 @@ fun EuchreScreen(
                         .background(FeltGreenDark),
                     contentAlignment = Alignment.Center,
                 ) {
-                    TrickArea(current, localSeat, cardWidth)
+                    TrickArea(current, localSeat, cardWidth, trickHoldMillis)
                 }
 
                 notice?.let {
@@ -166,8 +181,47 @@ private fun seatLabel(relative: Int): String = when (relative) {
  * turned to face them, so you can read a trick at a glance instead of matching
  * seat numbers to cards.
  */
+/** How long a completed trick rests on the table before being swept away. */
+const val TRICK_HOLD_MILLIS = 1_000L
+
+/** Duration of the sweep itself. */
+private const val TRICK_SWEEP_MILLIS = 450
+
 @Composable
-private fun TrickArea(state: EuchreState, localSeat: Int, cardWidth: Dp) {
+private fun TrickArea(
+    state: EuchreState,
+    localSeat: Int,
+    cardWidth: Dp,
+    trickHoldMillis: Long,
+) {
+    // A finished trick stays put for a beat so it can be read, then slides off
+    // towards whoever won it.
+    val sweeping = state.trick.isEmpty() && state.completedTrick.isNotEmpty()
+    val cardsOnTable = if (sweeping) state.completedTrick else state.trick
+
+    var sweepStarted by remember(state.completedTrick) { mutableStateOf(false) }
+    LaunchedEffect(state.completedTrick) {
+        if (state.completedTrick.isNotEmpty()) {
+            delay(trickHoldMillis)
+            sweepStarted = true
+        }
+    }
+    val sweep by animateFloatAsState(
+        targetValue = if (sweeping && sweepStarted) 1f else 0f,
+        animationSpec = tween(durationMillis = TRICK_SWEEP_MILLIS),
+        label = "trickSweep",
+    )
+
+    // Everything travels towards the winner's edge of the table together.
+    val winnerRelative = state.lastTrickWinner?.let { relativePosition(it, localSeat) } ?: 0
+    val (dirX, dirY) = when (winnerRelative) {
+        0 -> 0f to 1f
+        1 -> -1f to 0f
+        2 -> 0f to -1f
+        else -> 1f to 0f
+    }
+    val travelPx = with(LocalDensity.current) { (cardWidth * 2.5f).toPx() }
+
     Box(modifier = Modifier.fillMaxSize().padding(4.dp)) {
 
         // The turn card sits in the middle of the table during bidding.
@@ -185,7 +239,9 @@ private fun TrickArea(state: EuchreState, localSeat: Int, cardWidth: Dp) {
             }
         }
 
-        if (state.upCard == null && state.trick.isEmpty() && state.phase == EuchrePhase.PLAYING) {
+        if (state.upCard == null && cardsOnTable.isEmpty() &&
+            state.phase == EuchrePhase.PLAYING
+        ) {
             Text(
                 text = if (state.turn == localSeat) "Lead a card" else "Waiting…",
                 color = MaterialTheme.colorScheme.onPrimary,
@@ -193,7 +249,7 @@ private fun TrickArea(state: EuchreState, localSeat: Int, cardWidth: Dp) {
             )
         }
 
-        state.trick.forEach { played ->
+        cardsOnTable.forEach { played ->
             val relative = relativePosition(played.seat, localSeat)
             val alignment = when (relative) {
                 0 -> Alignment.BottomCenter
@@ -211,7 +267,15 @@ private fun TrickArea(state: EuchreState, localSeat: Int, cardWidth: Dp) {
             }
 
             Column(
-                modifier = Modifier.align(alignment),
+                modifier = Modifier
+                    .align(alignment)
+                    .offset {
+                        IntOffset(
+                            x = (dirX * travelPx * sweep).roundToInt(),
+                            y = (dirY * travelPx * sweep).roundToInt(),
+                        )
+                    }
+                    .alpha(1f - sweep),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 PlayingCardView(
@@ -225,6 +289,16 @@ private fun TrickArea(state: EuchreState, localSeat: Int, cardWidth: Dp) {
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
             }
+        }
+
+        // Name the winner while their cards are still on the table.
+        if (sweeping && state.lastTrickWinner != null) {
+            Text(
+                text = "${seatLabel(winnerRelative)} takes it",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.align(Alignment.Center).alpha(1f - sweep),
+            )
         }
 
         // Who is on the clock, shown where they sit rather than as a seat number.
@@ -242,6 +316,7 @@ private fun TrickArea(state: EuchreState, localSeat: Int, cardWidth: Dp) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BiddingControls(
     state: EuchreState,
@@ -260,6 +335,8 @@ private fun BiddingControls(
     // the turn card to somebody else or to yourself.
     val youAreDealer = state.turn == state.dealer
     val upCard = state.upCard
+    val canPass = Pass in legal
+    val choices = legal.filter { it != Pass }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
@@ -282,13 +359,25 @@ private fun BiddingControls(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
+        // Stick the dealer is the one case where there is genuinely no way out,
+        // so say so rather than leaving it looking like a missing button.
+        if (!canPass) {
+            Text(
+                text = "Everyone has passed, so as dealer you must name a suit — " +
+                    "that's stick the dealer. Turn it off in game setup if you'd " +
+                    "rather the hand be thrown in.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        // Wraps rather than scrolls. A scrolling row pushed Pass off the right
+        // edge of a phone screen, which made bidding look compulsory.
+        FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            legal.forEach { move ->
+            choices.forEach { move ->
                 val label = when (move) {
-                    is Pass -> "Pass"
                     is OrderUp -> when {
                         youAreDealer && move.alone -> "Pick it up, alone"
                         youAreDealer -> "Pick it up"
@@ -301,12 +390,20 @@ private fun BiddingControls(
 
                     is Discard -> "Discard ${move.card.label}"
                     is PlayCard -> move.card.label
+                    is Pass -> "Pass"
                 }
-                if (move is Pass) {
-                    OutlinedButton(onClick = { onMove(move) }) { Text(label) }
-                } else {
-                    Button(onClick = { onMove(move) }) { Text(label) }
-                }
+                Button(onClick = { onMove(move) }) { Text(label) }
+            }
+        }
+
+        // Kept out of the wrapping group and full width so it can never be
+        // clipped, scrolled away or mistaken for one of the bids.
+        if (canPass) {
+            OutlinedButton(
+                onClick = { onMove(Pass) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Pass")
             }
         }
     }
