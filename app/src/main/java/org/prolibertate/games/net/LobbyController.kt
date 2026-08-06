@@ -14,12 +14,11 @@ import org.prolibertate.games.game.engine.TableConfig
 /**
  * The pre-game lobby.
  *
- * The host advertises on every available transport at once, so a table can mix
- * players arriving over Wi-Fi with players arriving over Bluetooth — from the
- * seat list's point of view a peer is a peer. Seats start filled with AI and
- * are handed over to people as they join, which is what makes "AI, humans, or
- * any combination" fall out for free: whatever is still AI when the host
- * starts, stays AI.
+ * The host advertises on every available transport at once — from the seat
+ * list's point of view a peer is a peer, whichever one it arrived on. Seats
+ * start filled with AI and are handed over to people as they join, which is
+ * what makes "AI, humans, or any combination" fall out for free: whatever is
+ * still AI when the host starts, stays AI.
  */
 class LobbyController(
     context: Context,
@@ -40,9 +39,8 @@ class LobbyController(
     )
 
     private val lan = LanTransport(context)
-    private val bluetooth = BluetoothTransport(context)
 
-    val transports: List<Transport> = listOf(lan, bluetooth)
+    val transports: List<Transport> = listOf(lan)
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()

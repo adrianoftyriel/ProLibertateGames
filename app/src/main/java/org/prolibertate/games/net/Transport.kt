@@ -19,12 +19,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 enum class TransportKind(val label: String) {
     LAN("Wi-Fi"),
-    BLUETOOTH("Bluetooth"),
 }
 
 /**
  * A host someone could join, found by one of the transports. [address] is
- * transport-specific: an IP for LAN, a MAC for Bluetooth.
+ * transport-specific: an IP for LAN.
  */
 data class DiscoveredHost(
     val id: String,
@@ -37,8 +36,8 @@ data class DiscoveredHost(
 /**
  * One peer-to-peer link carrying [NetMessage]s.
  *
- * Both transports end up with a plain pair of streams, so the framing and
- * serialisation live here once rather than twice.
+ * A transport ends up with a plain pair of streams, so the framing and
+ * serialisation live here rather than in each transport.
  */
 interface Connection : Closeable {
     val peerId: String
@@ -152,9 +151,8 @@ class StreamConnection(
 }
 
 /**
- * Discovery and connection setup. Everything after the handshake is the same
- * for both transports, which is what lets a lobby accept players over Wi-Fi and
- * Bluetooth at the same time.
+ * Discovery and connection setup. Everything after the handshake is transport
+ * independent, so a lobby accepts players without caring how they arrived.
  */
 interface Transport {
 

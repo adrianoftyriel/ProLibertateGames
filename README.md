@@ -1,7 +1,7 @@
 # Pro Libertate Games
 
 A collection of card and board games for Android, playable against the computer
-or against other people over Wi-Fi (LAN) or Bluetooth.
+or against other people over Wi-Fi (LAN).
 
 ## What works today
 
@@ -24,19 +24,13 @@ layers are game-agnostic and need no changes.
 ## Playing with other people
 
 Pick a game, choose **Host a game for others to join**, and the device advertises
-itself on every radio it has. Other devices choose **Join a game nearby** and
+itself on the network. Other devices choose **Join a game nearby** and
 pick the host from the list. Seats start out filled by the computer and are
 handed to people as they join, so any mix of humans and AI works — whatever is
 still marked *Computer* when the host starts stays AI.
 
 - **Wi-Fi (LAN)** — both devices must be on the same network. Discovery uses
   mDNS/NSD; play runs over a TCP socket.
-- **Bluetooth** — devices must already be **paired** in Android's Bluetooth
-  settings. Play runs over Classic RFCOMM. Scanning for unpaired devices is not
-  implemented.
-
-Both transports can be live at once, so some players can be on Wi-Fi and others
-on Bluetooth at the same table.
 
 ### How a match is kept in step
 
@@ -207,7 +201,7 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
   crazyeights/ Crazy 8s model, rules, AI
   chess/       Chess model, FEN, move generation, search
   tayu/        Ta Yü tile geometry, river rules, scoring, AI
-net/           wire protocol, LAN and Bluetooth transports, lobby, match driver
+net/           wire protocol, LAN transport, lobby, match driver
 settings/      DataStore-backed preferences
 update/        GitHub Releases OTA updater
 ui/            Compose screens

@@ -30,8 +30,8 @@ import org.prolibertate.games.net.seatForDevice
 /**
  * Hosting or joining a table.
  *
- * A host advertises on Wi-Fi and Bluetooth simultaneously, and the seat list
- * does not care which one a given player arrived on.
+ * A host advertises on every available transport, and the seat list does not
+ * care which one a given player arrived on.
  */
 @Composable
 fun LobbyScreen(
@@ -44,7 +44,6 @@ fun LobbyScreen(
     val state by env.lobby.state.collectAsState()
 
     LaunchedEffect(route) {
-        env.requestBluetoothPermissions()
         if (route.hosting) {
             // Seat the table the host actually set up, not the catalogue
             // minimum: the rules engine rejects a table of the wrong size.
@@ -80,7 +79,7 @@ fun LobbyScreen(
             val available = env.lobby.availableTransports()
             Text(
                 text = if (available.isEmpty()) {
-                    "No Wi-Fi or Bluetooth available. Turn one on to play with others."
+                    "No Wi-Fi available. Turn it on to play with others."
                 } else {
                     (if (route.hosting) "Visible over " else "Searching over ") +
                         available.joinToString(" and ") { it.kind.label } + "."
@@ -157,8 +156,7 @@ private fun JoiningBody(
     if (discovered.isEmpty()) {
         Text("No games found yet. Make sure the host has started theirs.")
         Text(
-            text = "Bluetooth only shows devices already paired in Android's " +
-                "Bluetooth settings.",
+            text = "Both devices need to be on the same Wi-Fi network.",
             style = MaterialTheme.typography.bodySmall,
         )
         return

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- OTA updates from GitHub Releases, plus LAN play over TCP sockets. -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -10,25 +9,7 @@
     <!-- Lets the app hand a downloaded APK to the system installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <!-- Bluetooth. Android 12 (API 31) replaced the catch-all BLUETOOTH
-         permission with explicit ones, so the legacy pair is capped below 31
-         and BLUETOOTH_CONNECT is requested at runtime above it.
-
-         Only CONNECT is declared because the transport talks exclusively to
-         devices that are already paired: it enumerates bonded devices and
-         opens an RFCOMM socket, neither of which is a scan. Adding discovery
-         of unpaired devices later would mean declaring BLUETOOTH_SCAN here
-         (and, below API 31, both ACCESS_FINE_LOCATION and
-         ACCESS_COARSE_LOCATION, which Android requires together). -->
-    <uses-permission android:name="android.permission.BLUETOOTH"
-        android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
-        android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
-        tools:targetApi="s" />
-
-    <!-- Both radios are optional: the app is fully playable against AI without them. -->
-    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <!-- The radio is optional: the app is fully playable against AI without it. -->
     <uses-feature android:name="android.hardware.wifi" android:required="false" />
 
     <application
