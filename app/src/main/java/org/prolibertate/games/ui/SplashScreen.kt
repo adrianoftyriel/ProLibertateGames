@@ -82,6 +82,8 @@ fun SplashScreen(
         TartanBackground(
             modifier = Modifier.fillMaxSize(),
             threadWidth = threadWidth,
+            // On the bias, matching the icon.
+            rotationDegrees = 45f,
         )
 
         // A scrim keeps the lettering legible over the busiest part of the sett.

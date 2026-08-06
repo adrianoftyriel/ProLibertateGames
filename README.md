@@ -5,7 +5,7 @@ or against other people over Wi-Fi (LAN) or Bluetooth.
 
 ## What works today
 
-The app shell is complete and two games are playable end to end:
+The app shell is complete and four games are playable end to end:
 
 | | |
 | --- | --- |
@@ -59,9 +59,9 @@ them.
 
 ## Branding
 
-The launcher icon is a single square of the Wallace tartan, and the app opens on
-a tartan splash carrying the name in a Celtic uncial hand for two seconds before
-fading into the menu.
+The launcher icon is a single square of the Wallace tartan set on the bias, and
+the app opens on the same cloth carrying the name in a Celtic uncial hand for two
+seconds before fading into the menu.
 
 The tartan is drawn, not an image: `ui/theme/Tartan.kt` lays the sett down as
 warp and then as weft at half opacity, which is what produces the blended
@@ -70,12 +70,14 @@ drawable, so it stays sharp at every density and needs no PNGs.
 
 Two honest caveats:
 
-- **The sett is an approximation.** `WallaceSett` reproduces what the Wallace
-  tartan reads as — a bold red and black check divided by a narrow gold
-  overstripe — but the registered threadcount could not be verified, so the
-  numbers were chosen to look right rather than to be authoritative. They are
-  plain data; replacing them with the registered counts rebrands the whole app
-  and needs no other change.
+- **The sett is matched by eye, not to a registered threadcount.**
+  `WallaceSett` is written as a half-sett and reflected about its pivots, the way
+  a threadcount is published: gold 6, black 6, red 36, black 24, red 36, black 6.
+  That gives a red ground at about two thirds, black bands alternating wide and
+  narrow, and one thin gold overstripe per repeat flanked by black — matched
+  against a reference swatch rather than to the Scottish Register of Tartans.
+  Substituting registered counts is an edit to that one list; the icon is
+  generated from the same numbers, so both follow.
 - **The typeface is bundled under a licence.** Uncial Antiqua, © 2011 Brian J.
   Bonislawsky DBA Astigmatic, Reserved Font Name "Uncial Antiqua", used under
   the SIL Open Font License 1.1. The full licence is at
