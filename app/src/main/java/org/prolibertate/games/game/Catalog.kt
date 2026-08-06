@@ -138,7 +138,7 @@ object GameCatalog {
             maxPlayers = 2,
             teamBased = false,
             blurb = "The old game. Full legal moves, castling, en passant, promotion.",
-            available = false,
+            available = true,
         ),
         GameDescriptor(
             id = CHECKERS,

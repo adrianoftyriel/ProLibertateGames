@@ -7,6 +7,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import org.prolibertate.games.game.GameCatalog
+import org.prolibertate.games.game.chess.ChessAi
+import org.prolibertate.games.game.chess.ChessMove
+import org.prolibertate.games.game.chess.ChessRules
+import org.prolibertate.games.game.chess.ChessState
 import org.prolibertate.games.game.crazyeights.CrazyEightsAi
 import org.prolibertate.games.game.crazyeights.CrazyEightsMove
 import org.prolibertate.games.game.crazyeights.CrazyEightsPhase
@@ -43,6 +47,7 @@ import org.prolibertate.games.game.wizard.WizardRules
 import org.prolibertate.games.game.wizard.WizardState
 import org.prolibertate.games.net.MatchController
 import org.prolibertate.games.settings.Settings
+import org.prolibertate.games.ui.game.ChessScreen
 import org.prolibertate.games.ui.game.CrazyEightsScreen
 import org.prolibertate.games.ui.game.EuchreScreen
 import org.prolibertate.games.ui.game.GolfScreen
@@ -271,6 +276,27 @@ fun PlayScreen(
             }
             StartMatch(env, controller, route)
             CrazyEightsScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.CHESS -> {
+            val controller = remember(route) {
+                MatchController<ChessState, ChessMove>(
+                    rules = ChessRules,
+                    // Strength comes from the table's own options, so the setup
+                    // screen sets it without this having to decode anything.
+                    ai = ChessAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    // The search is the thinking time; adding more on top of it
+                    // would only make the computer look slower than it is.
+                    aiThinkingMillis = { settings.scaled(250L) },
+                )
+            }
+            StartMatch(env, controller, route)
+            ChessScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
         }
 
         else -> Text("That game isn't playable yet.")

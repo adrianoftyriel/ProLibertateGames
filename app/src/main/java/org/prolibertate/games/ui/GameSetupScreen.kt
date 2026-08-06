@@ -30,6 +30,8 @@ import org.prolibertate.games.game.GameDescriptor
 import org.prolibertate.games.game.engine.PlayerKind
 import org.prolibertate.games.game.engine.PlayerSlot
 import org.prolibertate.games.game.engine.TableConfig
+import org.prolibertate.games.game.chess.ChessLevel
+import org.prolibertate.games.game.chess.ChessOptions
 import org.prolibertate.games.game.crazyeights.CrazyEightsOptions
 import org.prolibertate.games.game.euchre.EuchreOptions
 import org.prolibertate.games.game.golf.GolfOptions
@@ -54,7 +56,7 @@ fun GameSetupScreen(
     descriptor: GameDescriptor,
     playerName: String,
     onBack: () -> Unit,
-    onPlayOffline: (TableConfig) -> Unit,
+    onPlayOffline: (TableConfig, Int) -> Unit,
     onHostOnline: (String) -> Unit,
 ) {
     var euchre by remember { mutableStateOf(EuchreOptions()) }
@@ -64,6 +66,10 @@ fun GameSetupScreen(
     var kaiser by remember { mutableStateOf(KaiserOptions()) }
     var crazyEights by remember { mutableStateOf(CrazyEightsOptions()) }
     var wizard by remember { mutableStateOf(WizardOptions()) }
+    var chess by remember { mutableStateOf(ChessOptions()) }
+    // Not an engine option: which seat the local player takes. Seat 0 is
+    // always White, so choosing Black means sitting in seat 1.
+    var playWhite by remember { mutableStateOf(true) }
 
     val optionsJson = when (descriptor.id) {
         GameCatalog.EUCHRE -> setupJson.encodeToString(euchre)
@@ -73,6 +79,7 @@ fun GameSetupScreen(
         GameCatalog.KAISER -> setupJson.encodeToString(kaiser)
         GameCatalog.CRAZY_EIGHTS -> setupJson.encodeToString(crazyEights)
         GameCatalog.WIZARD -> setupJson.encodeToString(wizard)
+        GameCatalog.CHESS -> setupJson.encodeToString(chess)
         else -> "{}"
     }
     val seatCount = seatCountFor(descriptor.id, optionsJson)
@@ -98,6 +105,13 @@ fun GameSetupScreen(
                 }
 
                 GameCatalog.WIZARD -> WizardOptionsEditor(wizard) { wizard = it }
+                GameCatalog.CHESS -> ChessOptionsEditor(
+                    options = chess,
+                    playWhite = playWhite,
+                    onChange = { chess = it },
+                    onColour = { playWhite = it },
+                )
+
                 else -> Text("No options yet for this game.")
             }
 
@@ -110,9 +124,13 @@ fun GameSetupScreen(
                 style = MaterialTheme.typography.bodySmall,
             )
 
+            // Chess is the only game so far where the local player picks a
+            // seat rather than always taking the first one.
+            val localSeat = if (descriptor.id == GameCatalog.CHESS && !playWhite) 1 else 0
             PrimaryAction(text = "Play against the computer") {
                 onPlayOffline(
-                    offlineConfig(descriptor.id, optionsJson, seatCount, playerName)
+                    offlineConfig(descriptor.id, optionsJson, seatCount, playerName, localSeat),
+                    localSeat,
                 )
             }
             PrimaryAction(text = "Host a game for others to join") {
@@ -122,19 +140,20 @@ fun GameSetupScreen(
     }
 }
 
-/** Seat 0 is the local player; the rest start as AI. */
+/** [localSeat] is the person at this device; every other seat starts as AI. */
 private fun offlineConfig(
     gameId: String,
     optionsJson: String,
     seatCount: Int,
     playerName: String,
+    localSeat: Int = 0,
 ): TableConfig = TableConfig(
     gameId = gameId,
     seats = (0 until seatCount).map { seat ->
         PlayerSlot(
             seat = seat,
-            name = if (seat == 0) playerName else "Computer $seat",
-            kind = if (seat == 0) PlayerKind.HUMAN_LOCAL else PlayerKind.AI,
+            name = if (seat == localSeat) playerName else "Computer $seat",
+            kind = if (seat == localSeat) PlayerKind.HUMAN_LOCAL else PlayerKind.AI,
             team = teamForSeat(gameId, seat),
         )
     },
@@ -170,6 +189,7 @@ fun seatCountFor(gameId: String, optionsJson: String): Int {
             GameCatalog.WIZARD ->
                 setupJson.decodeFromString<WizardOptions>(optionsJson).playerCount
 
+            GameCatalog.CHESS -> 2
             else -> fallback
         }
     }.getOrDefault(fallback)
@@ -451,6 +471,48 @@ private fun WizardOptionsEditor(options: WizardOptions, onChange: (WizardOptions
         Text(
             text = "A full game deals the whole sixty-card pack out: " +
                 "${options.totalRounds()} rounds at this table.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun ChessOptionsEditor(
+    options: ChessOptions,
+    playWhite: Boolean,
+    onChange: (ChessOptions) -> Unit,
+    onColour: (Boolean) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "You play",
+            values = listOf(true, false),
+            selected = playWhite,
+            display = { if (it) "White" else "Black" },
+            onSelect = onColour,
+        )
+        ChipRow(
+            label = "Opponent",
+            values = ChessLevel.entries.toList(),
+            selected = options.level,
+            display = { it.label },
+            onSelect = { onChange(options.copy(level = it)) },
+        )
+        ToggleRow(
+            title = "Fifty-move rule",
+            subtitle = "Fifty moves each with no capture and no pawn move is a draw",
+            checked = options.fiftyMoveRule,
+            onChange = { onChange(options.copy(fiftyMoveRule = it)) },
+        )
+        ToggleRow(
+            title = "Threefold repetition",
+            subtitle = "The same position three times over is a draw",
+            checked = options.threefoldRepetition,
+            onChange = { onChange(options.copy(threefoldRepetition = it)) },
+        )
+        Text(
+            text = "Full rules: castling, en passant, promotion, stalemate, and a draw " +
+                "when neither side has enough material to mate.",
             style = MaterialTheme.typography.bodySmall,
         )
     }
