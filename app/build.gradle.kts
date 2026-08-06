@@ -101,7 +101,7 @@ dependencies {
     // Settings persistence for sound / animation speed / update preferences.
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Wire format for the LAN and Bluetooth game protocol.
+    // Wire format for the LAN game protocol.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 

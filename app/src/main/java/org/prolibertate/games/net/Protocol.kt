@@ -8,7 +8,7 @@ import org.prolibertate.games.game.engine.PlayerSlot
 import org.prolibertate.games.game.engine.TableConfig
 
 /**
- * The wire protocol, shared by the LAN and Bluetooth transports.
+ * The wire protocol, shared by every transport.
  *
  * The host is authoritative: clients send [MoveIntent] and render whatever
  * [StateSync] tells them. Nothing is trusted from a client beyond "I would like
@@ -18,12 +18,9 @@ import org.prolibertate.games.game.engine.TableConfig
  */
 const val PROTOCOL_VERSION = 1
 
-/** Service type advertised over mDNS, and the RFCOMM service name. */
+/** Service type and name advertised over mDNS. */
 const val SERVICE_TYPE = "_plgames._tcp"
 const val SERVICE_NAME = "ProLibertateGames"
-
-/** Fixed RFCOMM UUID. Both ends must agree; this is ours. */
-const val RFCOMM_UUID = "8f1d5a20-3a4e-4b26-9d31-6c0d2f7a91b4"
 
 val protocolJson: Json = Json {
     ignoreUnknownKeys = true

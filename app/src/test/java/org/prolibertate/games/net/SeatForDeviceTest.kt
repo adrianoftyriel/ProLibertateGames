@@ -33,10 +33,10 @@ class SeatForDeviceTest {
      * The regression this exists for.
      *
      * The seat used to be looked up by [PlayerSlot.peerId], which is the address
-     * the host's own transport made up for the incoming link — an IP on Wi-Fi, a
-     * MAC over Bluetooth. A guest has never seen that value and so never matched
-     * it, and every guest fell through to "the first seat held by somebody
-     * remote". With one guest that is right by luck. With two, both of them
+     * the host's own transport made up for the incoming link — an IP on Wi-Fi. A
+     * guest has never seen that value and so never matched it, and every guest
+     * fell through to "the first seat held by somebody remote". With one guest
+     * that is right by luck. With two, both of them
      * claimed seat 1, and the one really sitting in seat 2 was left looking at a
      * table with no cards in front of it.
      */

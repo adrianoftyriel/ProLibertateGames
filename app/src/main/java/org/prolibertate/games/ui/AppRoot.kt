@@ -48,7 +48,6 @@ class AppEnv(
     val updater: Updater,
     val lobby: LobbyController,
     val peerId: String,
-    val requestBluetoothPermissions: () -> Unit,
 )
 
 /**

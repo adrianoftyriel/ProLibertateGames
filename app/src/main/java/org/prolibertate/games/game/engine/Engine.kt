@@ -7,7 +7,7 @@ enum class PlayerKind {
     /** A person on this device. */
     HUMAN_LOCAL,
 
-    /** A person on another device, reached over LAN or Bluetooth. */
+    /** A person on another device, reached over the LAN. */
     HUMAN_REMOTE,
 
     /** Driven by the host's AI. */
@@ -28,7 +28,7 @@ data class PlayerSlot(
      *
      * Kept alongside [peerId] because the two answer different questions.
      * [peerId] is how the host recognises which link a message came in on, and is
-     * an address the transport made up — a socket's IP, a Bluetooth MAC. This is
+     * an address the transport made up — a socket's IP. This is
      * how a guest recognises *itself* in a seat list it did not write, and only
      * the guest's own id can do that.
      */
