@@ -139,12 +139,14 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                 )
                 if (settings.updateChannel != env.updater.installedChannel()) {
-                    // The channels are numbered independently, so a switch can
-                    // be a downgrade as far as Android is concerned.
+                    // Each channel installs under its own package, so the other
+                    // one arrives as a second app rather than replacing this
+                    // one — no downgrade for Android to refuse.
                     Text(
                         text = "You're on a ${env.updater.installedChannel().label} build. " +
-                            "Switching channels installs a different build rather than a " +
-                            "newer one — if Android refuses it, uninstall this copy first.",
+                            "The two channels install as separate apps, so this adds the " +
+                            "${settings.updateChannel.label} build alongside this one and " +
+                            "leaves it in place.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }

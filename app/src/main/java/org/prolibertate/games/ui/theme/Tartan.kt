@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.prolibertate.games.BuildConfig
 
 /** One band of a tartan sett, measured in threads. */
 data class TartanStripe(val color: Color, val threads: Int)
@@ -17,6 +18,15 @@ data class TartanStripe(val color: Color, val threads: Int)
 val WallaceRed = Color(0xFFE01B24)
 val WallaceBlack = Color(0xFF0C0C0C)
 val WallaceGold = Color(0xFFF2C518)
+
+/**
+ * The green the hunting sett puts where the clan sett puts red.
+ *
+ * Must match `tartan_field` for a dev build in app/build.gradle.kts, which is
+ * what the launcher icon is woven from — otherwise the icon and the splash it
+ * opens on would be visibly different cloth.
+ */
+val WallaceHuntingGreen = Color(0xFF1E7A3C)
 
 /**
  * Expands a half-sett into a full repeat by reflecting it.
@@ -42,13 +52,41 @@ fun List<TartanStripe>.pivoted(): List<TartanStripe> =
  *    between red and black;
  *  - the narrow black guard sits **between two red blocks**, splitting the red
  *    into pairs.
+ *
+ * The threadcount itself lives in [wallaceSett], because the hunting colourway
+ * below is the same cloth in a different colour and must not drift from it.
  */
-val WallaceSett: List<TartanStripe> = listOf(
+val WallaceSett: List<TartanStripe> = wallaceSett(WallaceRed)
+
+/**
+ * Wallace Hunting: the same threadcount woven in green.
+ *
+ * Hunting setts are the clan cloth in muted, outdoor colours, and for Wallace
+ * that is the one substitution — green for the red — with the black ground and
+ * the yellow overstripe untouched. Deriving it from the same builder rather
+ * than writing the numbers out twice is what keeps that true: a change to the
+ * threadcount cannot land in one colourway and miss the other.
+ */
+val WallaceHuntingSett: List<TartanStripe> = wallaceSett(WallaceHuntingGreen)
+
+/** The Wallace threadcount woven with [field] in place of the red. */
+private fun wallaceSett(field: Color): List<TartanStripe> = listOf(
     TartanStripe(WallaceBlack, 4),
-    TartanStripe(WallaceRed, 32),
+    TartanStripe(field, 32),
     TartanStripe(WallaceBlack, 32),
     TartanStripe(WallaceGold, 4),
 ).pivoted()
+
+/**
+ * The cloth this build wears: the clan sett on production, the hunting sett on
+ * dev.
+ *
+ * A dev build installs as its own app beside the production one, so it has to
+ * be recognisable at a glance in the app drawer and on the splash — the green
+ * says which of the two copies just opened without anything having to be read.
+ */
+val AppSett: List<TartanStripe> =
+    if (BuildConfig.DEV_BUILD) WallaceHuntingSett else WallaceSett
 
 /** Threads in one full repeat of a sett. */
 val List<TartanStripe>.threadsPerRepeat: Int get() = sumOf { it.threads }
@@ -62,7 +100,7 @@ val List<TartanStripe>.threadsPerRepeat: Int get() = sumOf { it.threads }
  * and stops reading as tartan at all.
  */
 fun threadWidthFor(
-    sett: List<TartanStripe> = WallaceSett,
+    sett: List<TartanStripe> = AppSett,
     across: Dp,
     repeats: Float = 2f,
 ): Dp = across / (sett.threadsPerRepeat * repeats)
@@ -77,7 +115,7 @@ fun threadWidthFor(
  * past the edges of the canvas so the corners stay covered once it is turned.
  */
 fun DrawScope.drawTartan(
-    sett: List<TartanStripe> = WallaceSett,
+    sett: List<TartanStripe> = AppSett,
     threadSize: Float,
     rotationDegrees: Float = 0f,
 ) {
@@ -135,7 +173,7 @@ fun DrawScope.drawTartan(
 @Composable
 fun TartanBackground(
     modifier: Modifier = Modifier,
-    sett: List<TartanStripe> = WallaceSett,
+    sett: List<TartanStripe> = AppSett,
     threadWidth: Dp = 2.dp,
     rotationDegrees: Float = 0f,
 ) {
