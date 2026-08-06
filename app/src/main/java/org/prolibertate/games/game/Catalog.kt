@@ -154,6 +154,22 @@ object GameCatalog {
 
     fun byId(id: String): GameDescriptor? = all.firstOrNull { it.id == id }
 
-    fun byCategory(category: GameCategory): List<GameDescriptor> =
-        all.filter { it.category == category }
+    /**
+     * Games in a category.
+     *
+     * [includeComingSoon] is what separates the two update channels: a dev
+     * build lists everything, including the games that are still only entries
+     * in this table, so the roadmap is visible while working on it. A
+     * production build lists only what can actually be played, so nobody
+     * downloads a release and taps into a dead end.
+     */
+    fun byCategory(
+        category: GameCategory,
+        includeComingSoon: Boolean = true,
+    ): List<GameDescriptor> = all.filter {
+        it.category == category && (includeComingSoon || it.available)
+    }
+
+    /** Everything currently playable, regardless of category. */
+    val playable: List<GameDescriptor> get() = all.filter { it.available }
 }

@@ -12,7 +12,11 @@ The app shell is complete and two games are playable end to end:
 | **Playable** | Euchre, Sequence |
 | **Listed, not yet implemented** | Kaiser, President, Golf, Wizard, Crazy 8s, Mastermind, Backgammon, Chess, Checkers |
 
-Unimplemented games appear in the menu marked *Coming soon*. Adding one means
+Unimplemented games appear in the menu marked *Coming soon* **on dev builds
+only** — a production release lists just the games that can actually be played,
+so nobody installs it and taps into a dead end. The menu decides this from the
+installed APK's own version name, so it follows the build rather than the
+channel selected for future updates. Adding one means
 writing a `GameRules` implementation, a `GameAi`, and a screen, then flipping
 `available` in `GameCatalog` — the menu, lobby, networking, settings and OTA
 layers are game-agnostic and need no changes.
