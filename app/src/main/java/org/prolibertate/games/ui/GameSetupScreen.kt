@@ -38,6 +38,9 @@ import org.prolibertate.games.game.golf.GolfOptions
 import org.prolibertate.games.game.kaiser.KaiserOptions
 import org.prolibertate.games.game.president.PresidentOptions
 import org.prolibertate.games.game.sequence.SequenceOptions
+import org.prolibertate.games.game.tayu.TayuLevel
+import org.prolibertate.games.game.tayu.TayuOptions
+import org.prolibertate.games.game.tayu.TayuTiles
 import org.prolibertate.games.game.wizard.WizardOptions
 
 private val setupJson = Json {
@@ -67,6 +70,7 @@ fun GameSetupScreen(
     var crazyEights by remember { mutableStateOf(CrazyEightsOptions()) }
     var wizard by remember { mutableStateOf(WizardOptions()) }
     var chess by remember { mutableStateOf(ChessOptions()) }
+    var tayu by remember { mutableStateOf(TayuOptions()) }
     // Not an engine option: which seat the local player takes. Seat 0 is
     // always White, so choosing Black means sitting in seat 1.
     var playWhite by remember { mutableStateOf(true) }
@@ -80,6 +84,7 @@ fun GameSetupScreen(
         GameCatalog.CRAZY_EIGHTS -> setupJson.encodeToString(crazyEights)
         GameCatalog.WIZARD -> setupJson.encodeToString(wizard)
         GameCatalog.CHESS -> setupJson.encodeToString(chess)
+        GameCatalog.TAYU -> setupJson.encodeToString(tayu)
         else -> "{}"
     }
     val seatCount = seatCountFor(descriptor.id, optionsJson)
@@ -111,6 +116,8 @@ fun GameSetupScreen(
                     onChange = { chess = it },
                     onColour = { playWhite = it },
                 )
+
+                GameCatalog.TAYU -> TayuOptionsEditor(tayu) { tayu = it }
 
                 else -> Text("No options yet for this game.")
             }
@@ -190,14 +197,20 @@ fun seatCountFor(gameId: String, optionsJson: String): Int {
                 setupJson.decodeFromString<WizardOptions>(optionsJson).playerCount
 
             GameCatalog.CHESS -> 2
+
+            GameCatalog.TAYU ->
+                setupJson.decodeFromString<TayuOptions>(optionsJson).playerCount
+
             else -> fallback
         }
     }.getOrDefault(fallback)
 }
 
 fun teamForSeat(gameId: String, seat: Int): Int = when (gameId) {
-    // Partners sit opposite each other.
-    GameCatalog.EUCHRE, GameCatalog.KAISER, GameCatalog.SEQUENCE -> seat % 2
+    // Partners sit opposite each other. In Ta Yü that is also which pair of
+    // edges you are running your rivers to: even seats north and south, odd
+    // seats east and west.
+    GameCatalog.EUCHRE, GameCatalog.KAISER, GameCatalog.SEQUENCE, GameCatalog.TAYU -> seat % 2
     // Everyone else plays for themselves.
     else -> seat
 }
@@ -513,6 +526,47 @@ private fun ChessOptionsEditor(
         Text(
             text = "Full rules: castling, en passant, promotion, stalemate, and a draw " +
                 "when neither side has enough material to mate.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun TayuOptionsEditor(options: TayuOptions, onChange: (TayuOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Players",
+            values = listOf(2, 4),
+            selected = options.playerCount,
+            display = { if (it == 2) "2, head to head" else "4, in partnerships" },
+            onSelect = { onChange(options.copy(playerCount = it)) },
+        )
+        ChipRow(
+            label = "Opponent",
+            values = TayuLevel.entries.toList(),
+            selected = options.level,
+            display = { it.label },
+            onSelect = { onChange(options.copy(level = it)) },
+        )
+        ChipRow(
+            label = "Tiles",
+            values = listOf(2, 3, 4),
+            selected = options.tileCopies,
+            display = { copies ->
+                val count = copies * TayuTiles.all.size
+                when (copies) {
+                    3 -> "$count, as reissued"
+                    4 -> "$count, as first published"
+                    else -> "$count, a short game"
+                }
+            },
+            onSelect = { onChange(options.copy(tileCopies = it)) },
+        )
+        Text(
+            text = "There are ${TayuTiles.all.size} different tiles, and the bag holds " +
+                "${options.tileCopies} of each. Even seats run their rivers north and " +
+                "south, odd seats east and west, and a side's score is one edge " +
+                "multiplied by the other — so reaching only one of them is worth nothing.",
             style = MaterialTheme.typography.bodySmall,
         )
     }

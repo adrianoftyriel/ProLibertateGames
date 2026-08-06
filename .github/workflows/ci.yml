@@ -31,10 +31,17 @@ jobs:
     name: Build and check
     runs-on: ubuntu-latest
     env:
-      # Stamp the APK as a dev-channel build only when this is a real push to
-      # dev. Pull request builds stay unstamped at 1.0.0-dev, since they are
-      # never published and must not claim a channel version.
-      PLG_CHANNEL: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/dev') && 'dev' || '' }}
+      # Stamp the APK as a dev-channel build exactly when it is a build of the
+      # dev branch, which is exactly when it can be published below. Pull
+      # request builds run against refs/pull/N/merge, so they stay unstamped at
+      # 1.0.0-dev: they are never published and must not claim a channel
+      # version.
+      #
+      # This condition has to stay in step with the publish steps' own. Stamping
+      # a build the publish steps would ship, or shipping one this left
+      # unstamped, both end the same way — an APK claiming versionCode 1, which
+      # the updater can never see as an upgrade over anything.
+      PLG_CHANNEL: ${{ github.ref == 'refs/heads/dev' && 'dev' || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -77,11 +84,16 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      # Everything below publishes the dev channel, and only ever from a push
-      # to dev that has already built, tested and linted clean above.
+      # Everything below publishes the dev channel, and only ever from the dev
+      # branch itself, after it has built, tested and linted clean above.
+      #
+      # Gated on the branch alone rather than on the event, which is how
+      # release.yml has always gated main. A pull request is still excluded
+      # without needing to name it: a PR build runs against refs/pull/N/merge,
+      # never refs/heads/dev, so a fork still cannot ship anything.
       - name: Stage dev APK
         id: stage
-        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        if: github.ref == 'refs/heads/dev'
         run: |
           set -euo pipefail
           version="v1.0.${{ github.run_number }}-dev"
@@ -92,7 +104,7 @@ jobs:
           echo "apk=$dest" >> "$GITHUB_OUTPUT"
 
       - name: Publish dev channel prerelease
-        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        if: github.ref == 'refs/heads/dev'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

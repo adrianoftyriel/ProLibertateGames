@@ -133,6 +133,10 @@ class LobbyController(
             name = hello.displayName,
             kind = PlayerKind.HUMAN_REMOTE,
             peerId = connection.peerId,
+            // Recorded so the guest can find itself in this list once it is sent
+            // back: connection.peerId is an address this end invented and the
+            // guest has never seen.
+            deviceId = hello.peerId,
         )
         connections[connection.peerId] = connection
         _state.value = current.copy(
@@ -178,6 +182,9 @@ class LobbyController(
             kind = kind,
             name = name ?: seats[seat].name,
             peerId = if (kind == PlayerKind.AI) null else seats[seat].peerId,
+            // A dropped player must stop claiming the seat, or it would still
+            // recognise itself in it when the table starts.
+            deviceId = if (kind == PlayerKind.AI) null else seats[seat].deviceId,
         )
         _state.value = current.copy(seats = seats)
         scope.launch { broadcastLobby() }

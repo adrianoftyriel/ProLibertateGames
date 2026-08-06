@@ -23,6 +23,16 @@ data class PlayerSlot(
     val team: Int,
     /** Identifies the remote device for [PlayerKind.HUMAN_REMOTE] seats. */
     val peerId: String? = null,
+    /**
+     * The joining device's own id, as it introduced itself.
+     *
+     * Kept alongside [peerId] because the two answer different questions.
+     * [peerId] is how the host recognises which link a message came in on, and is
+     * an address the transport made up — a socket's IP, a Bluetooth MAC. This is
+     * how a guest recognises *itself* in a seat list it did not write, and only
+     * the guest's own id can do that.
+     */
+    val deviceId: String? = null,
 )
 
 @Serializable

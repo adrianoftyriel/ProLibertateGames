@@ -25,6 +25,7 @@ import org.prolibertate.games.game.engine.PlayerKind
 import org.prolibertate.games.game.engine.TableConfig
 import org.prolibertate.games.net.DiscoveredHost
 import org.prolibertate.games.net.LobbyController
+import org.prolibertate.games.net.seatForDevice
 
 /**
  * Hosting or joining a table.
@@ -66,9 +67,7 @@ fun LobbyScreen(
         val seat = if (route.hosting) {
             0
         } else {
-            config.seats.firstOrNull { it.peerId == env.peerId }?.seat
-                ?: config.seats.firstOrNull { it.kind == PlayerKind.HUMAN_REMOTE }?.seat
-                ?: 0
+            seatForDevice(config, env.peerId)
         }
         env.lobby.clearStarted()
         onStart(config, route.hosting, seat)

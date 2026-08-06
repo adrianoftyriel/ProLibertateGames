@@ -5,11 +5,11 @@ or against other people over Wi-Fi (LAN) or Bluetooth.
 
 ## What works today
 
-The app shell is complete and eight games are playable end to end:
+The app shell is complete and nine games are playable end to end:
 
 | | |
 | --- | --- |
-| **Playable** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s, Sequence, Chess |
+| **Playable** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s, Sequence, Chess, Ta Yü |
 | **Listed, not yet implemented** | Mastermind, Backgammon, Checkers |
 
 Unimplemented games appear in the menu marked *Coming soon* **on dev builds
@@ -93,6 +93,11 @@ always square and sized to fit whatever is left after the hand, and card widths
 are a fraction of the smaller screen dimension. Rotation is handled inside the
 activity, so a hand is not lost when the device turns.
 
+The Ta Yü board is the tightest fit of the lot — 18 × 18 cells comes out under
+20dp a cell on a phone — which is why laying a tile there is a tap to line the
+placement up and a button to commit it, rather than a single tap on a target
+smaller than a fingertip.
+
 ## Building
 
 ```sh
@@ -134,15 +139,28 @@ Both pipelines publish, to two separate channels:
 | Channel | Published by | Tag | Marked |
 | --- | --- | --- | --- |
 | Production | `release.yml`, push to `main` | `v1.0.<n>` | release |
-| Dev | `ci.yml`, push to `dev` | `v1.0.<n>-dev` | prerelease |
+| Dev | `ci.yml`, any build of `dev` | `v1.0.<n>-dev` | prerelease |
 
 Dev builds are published as **prereleases** deliberately: GitHub's "latest
 release" endpoint skips prereleases, so a production-channel install can never
 be handed a dev build even by accident. Pull requests build and check but never
 publish, so a PR from a fork cannot ship anything.
 
-`release.yml` additionally refuses to run off any branch but `main`, so a manual
-dispatch aimed elsewhere does nothing rather than shipping unreviewed code.
+**Both pipelines gate publishing on the branch rather than on what triggered
+the build**, so a manual run from the Actions tab publishes exactly as a push
+does — useful when a push cannot fire the workflow itself, which is the case
+for anything pushed by an automation token. The safety property is unchanged,
+because publishing still happens only after that same job has built, tested and
+linted clean. A pull request is still excluded without having to be named: a PR
+build runs against `refs/pull/<n>/merge`, never `refs/heads/dev`.
+
+In `ci.yml` the `PLG_CHANNEL` stamp is gated on the same condition as the
+publish steps, and the two have to stay in step. Stamping a build that then
+ships, or shipping one that was left unstamped, both end with an APK claiming
+`versionCode` 1 — which the updater can never see as an upgrade over anything.
+
+`release.yml` refuses to run off any branch but `main`, so a manual dispatch
+aimed elsewhere does nothing rather than shipping unreviewed code.
 
 **The two channels have independent version sequences** — a build's `versionCode`
 is the run number of the workflow that produced it, and the two workflows count
@@ -170,6 +188,9 @@ game:
 - [Wizard](docs/RULES-wizard.md)
 - [Crazy 8s](docs/RULES-crazy8s.md)
 - [Chess](docs/RULES-chess.md)
+- [Ta Yü](docs/RULES-tayu.md) — **note the caveats about the reconstruction**:
+  the game is out of print and the rulebook could not be obtained, so the
+  document says which parts are attested and which were derived
 
 ## Layout
 
@@ -185,6 +206,7 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
   wizard/      Wizard model, rules, AI
   crazyeights/ Crazy 8s model, rules, AI
   chess/       Chess model, FEN, move generation, search
+  tayu/        Ta Yü tile geometry, river rules, scoring, AI
 net/           wire protocol, LAN and Bluetooth transports, lobby, match driver
 settings/      DataStore-backed preferences
 update/        GitHub Releases OTA updater

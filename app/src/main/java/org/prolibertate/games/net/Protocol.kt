@@ -3,6 +3,7 @@ package org.prolibertate.games.net
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.prolibertate.games.game.engine.PlayerKind
 import org.prolibertate.games.game.engine.PlayerSlot
 import org.prolibertate.games.game.engine.TableConfig
 
@@ -29,6 +30,24 @@ val protocolJson: Json = Json {
     encodeDefaults = true
     classDiscriminator = "t"
 }
+
+/**
+ * Which seat [deviceId] is sitting in, given the table the host has settled on.
+ *
+ * A guest has to answer this for itself: the seat list arrives as a whole and
+ * says nothing about who is reading it. Matching on [PlayerSlot.deviceId] is the
+ * only reliable way round, because that is the one field a guest can recognise —
+ * [PlayerSlot.peerId] is an address the host's transport invented for the link
+ * and bears no relation to anything the guest knows about itself.
+ *
+ * The fall back to the first remote seat is for a host running a version that
+ * sends no device ids. It is right whenever there is only one guest, and with two
+ * it hands them both the same seat, which is why it is only ever reached last.
+ */
+fun seatForDevice(config: TableConfig, deviceId: String): Int =
+    config.seats.firstOrNull { it.deviceId == deviceId }?.seat
+        ?: config.seats.firstOrNull { it.kind == PlayerKind.HUMAN_REMOTE }?.seat
+        ?: 0
 
 @Serializable
 sealed interface NetMessage
@@ -82,6 +101,19 @@ data class StateSync(
 @Serializable
 @SerialName("intent")
 data class MoveIntent(val moveJson: String) : NetMessage
+
+/**
+ * A client asking for the current state.
+ *
+ * A guest's link is opened in the lobby and is only handed to the table once the
+ * host's [StartGame] has been through a recomposition, so the host publishes the
+ * opening position before the guest's table is listening for it. Rather than
+ * leave that to timing, the guest asks as soon as it is listening — which is also
+ * what gets a guest back in step after any missed push.
+ */
+@Serializable
+@SerialName("resync")
+data object Resync : NetMessage
 
 @Serializable
 @SerialName("rejected")
