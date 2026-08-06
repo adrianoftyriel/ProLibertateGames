@@ -9,8 +9,8 @@ The app shell is complete and two games are playable end to end:
 
 | | |
 | --- | --- |
-| **Playable** | Euchre, Sequence |
-| **Listed, not yet implemented** | Kaiser, President, Golf, Wizard, Crazy 8s, Mastermind, Backgammon, Chess, Checkers |
+| **Playable** | Euchre, Sequence, President, Golf |
+| **Listed, not yet implemented** | Kaiser, Wizard, Crazy 8s, Mastermind, Backgammon, Chess, Checkers |
 
 Unimplemented games appear in the menu marked *Coming soon* **on dev builds
 only** — a production release lists just the games that can actually be played,
@@ -145,6 +145,8 @@ game:
 
 - [Euchre](docs/RULES-euchre.md)
 - [Sequence](docs/RULES-sequence.md) — **note the caveat about the board layout**
+- [President](docs/RULES-president.md)
+- [Golf](docs/RULES-golf.md)
 
 ## Layout
 
@@ -154,6 +156,8 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
   engine/      GameRules / GameAi contracts, seats, table config
   euchre/      Euchre model, rules, AI
   sequence/    Sequence model, board, rules, AI
+  president/   President model, rules, AI
+  golf/        Golf model, scoring, rules, AI
 net/           wire protocol, LAN and Bluetooth transports, lobby, match driver
 settings/      DataStore-backed preferences
 update/        GitHub Releases OTA updater

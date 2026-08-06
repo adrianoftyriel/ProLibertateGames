@@ -12,6 +12,16 @@ import org.prolibertate.games.game.euchre.EuchreMove
 import org.prolibertate.games.game.euchre.EuchrePhase
 import org.prolibertate.games.game.euchre.EuchreRules
 import org.prolibertate.games.game.euchre.EuchreState
+import org.prolibertate.games.game.golf.GolfAi
+import org.prolibertate.games.game.golf.GolfMove
+import org.prolibertate.games.game.golf.GolfPhase
+import org.prolibertate.games.game.golf.GolfRules
+import org.prolibertate.games.game.golf.GolfState
+import org.prolibertate.games.game.president.PresidentAi
+import org.prolibertate.games.game.president.PresidentMove
+import org.prolibertate.games.game.president.PresidentPhase
+import org.prolibertate.games.game.president.PresidentRules
+import org.prolibertate.games.game.president.PresidentState
 import org.prolibertate.games.game.sequence.SequenceAi
 import org.prolibertate.games.game.sequence.SequenceMove
 import org.prolibertate.games.game.sequence.SequenceRules
@@ -19,6 +29,8 @@ import org.prolibertate.games.game.sequence.SequenceState
 import org.prolibertate.games.net.MatchController
 import org.prolibertate.games.settings.Settings
 import org.prolibertate.games.ui.game.EuchreScreen
+import org.prolibertate.games.ui.game.GolfScreen
+import org.prolibertate.games.ui.game.PresidentScreen
 import org.prolibertate.games.ui.game.TRICK_HOLD_MILLIS
 import org.prolibertate.games.ui.game.SequenceScreen
 
@@ -94,6 +106,50 @@ fun PlayScreen(
             }
             StartMatch(env, controller, route)
             SequenceScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.PRESIDENT -> {
+            val controller = remember(route) {
+                MatchController<PresidentState, PresidentMove>(
+                    rules = PresidentRules,
+                    ai = PresidentAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    advanceIdle = { state ->
+                        if (state.phase == PresidentPhase.ROUND_OVER) {
+                            PresidentRules.nextRound(state)
+                        } else {
+                            null
+                        }
+                    },
+                    aiThinkingMillis = { settings.scaled(700L) },
+                )
+            }
+            StartMatch(env, controller, route)
+            PresidentScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.GOLF -> {
+            val controller = remember(route) {
+                MatchController<GolfState, GolfMove>(
+                    rules = GolfRules,
+                    ai = GolfAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    advanceIdle = { state ->
+                        if (state.phase == GolfPhase.HOLE_OVER) GolfRules.nextHole(state) else null
+                    },
+                    aiThinkingMillis = { settings.scaled(700L) },
+                )
+            }
+            StartMatch(env, controller, route)
+            GolfScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
         }
 
         else -> Text("That game isn't playable yet.")

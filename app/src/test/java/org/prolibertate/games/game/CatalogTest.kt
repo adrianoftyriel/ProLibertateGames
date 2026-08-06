@@ -50,7 +50,12 @@ class CatalogTest {
     @Test
     fun `playable games are the ones with engines wired up`() {
         assertEquals(
-            setOf(GameCatalog.EUCHRE, GameCatalog.SEQUENCE),
+            setOf(
+                GameCatalog.EUCHRE,
+                GameCatalog.SEQUENCE,
+                GameCatalog.PRESIDENT,
+                GameCatalog.GOLF,
+            ),
             GameCatalog.playable.map { it.id }.toSet(),
         )
     }

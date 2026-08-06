@@ -68,7 +68,7 @@ object GameCatalog {
             maxPlayers = 7,
             teamBased = false,
             blurb = "Shed your hand first and rule the table. Last one out serves the drinks.",
-            available = false,
+            available = true,
         ),
         GameDescriptor(
             id = GOLF,
@@ -78,7 +78,7 @@ object GameCatalog {
             maxPlayers = 6,
             teamBased = false,
             blurb = "Lowest score wins over nine holes. Match pairs to cancel them out.",
-            available = false,
+            available = true,
         ),
         GameDescriptor(
             id = WIZARD,

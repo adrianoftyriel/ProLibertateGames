@@ -2,6 +2,8 @@ package org.prolibertate.games.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -29,6 +31,8 @@ import org.prolibertate.games.game.engine.PlayerKind
 import org.prolibertate.games.game.engine.PlayerSlot
 import org.prolibertate.games.game.engine.TableConfig
 import org.prolibertate.games.game.euchre.EuchreOptions
+import org.prolibertate.games.game.golf.GolfOptions
+import org.prolibertate.games.game.president.PresidentOptions
 import org.prolibertate.games.game.sequence.SequenceOptions
 
 private val setupJson = Json { encodeDefaults = true }
@@ -49,15 +53,21 @@ fun GameSetupScreen(
 ) {
     var euchre by remember { mutableStateOf(EuchreOptions()) }
     var sequence by remember { mutableStateOf(SequenceOptions()) }
+    var president by remember { mutableStateOf(PresidentOptions()) }
+    var golf by remember { mutableStateOf(GolfOptions()) }
 
     val optionsJson = when (descriptor.id) {
         GameCatalog.EUCHRE -> setupJson.encodeToString(euchre)
         GameCatalog.SEQUENCE -> setupJson.encodeToString(sequence)
+        GameCatalog.PRESIDENT -> setupJson.encodeToString(president)
+        GameCatalog.GOLF -> setupJson.encodeToString(golf)
         else -> "{}"
     }
     val seatCount = when (descriptor.id) {
         GameCatalog.EUCHRE -> 4
         GameCatalog.SEQUENCE -> sequence.playerCount
+        GameCatalog.PRESIDENT -> president.playerCount
+        GameCatalog.GOLF -> golf.playerCount
         else -> descriptor.minPlayers
     }
 
@@ -74,6 +84,8 @@ fun GameSetupScreen(
             when (descriptor.id) {
                 GameCatalog.EUCHRE -> EuchreOptionsEditor(euchre) { euchre = it }
                 GameCatalog.SEQUENCE -> SequenceOptionsEditor(sequence) { sequence = it }
+                GameCatalog.PRESIDENT -> PresidentOptionsEditor(president) { president = it }
+                GameCatalog.GOLF -> GolfOptionsEditor(golf) { golf = it }
                 else -> Text("No options yet for this game.")
             }
 
@@ -121,8 +133,9 @@ private fun offlineConfig(
 
 fun teamForSeat(gameId: String, seat: Int): Int = when (gameId) {
     // Partners sit opposite each other.
-    GameCatalog.EUCHRE -> seat % 2
-    else -> seat % 2
+    GameCatalog.EUCHRE, GameCatalog.SEQUENCE -> seat % 2
+    // Everyone else plays for themselves.
+    else -> seat
 }
 
 @Composable
@@ -198,6 +211,95 @@ private fun SequenceOptionsEditor(options: SequenceOptions, onChange: (SequenceO
 }
 
 @Composable
+private fun PresidentOptionsEditor(
+    options: PresidentOptions,
+    onChange: (PresidentOptions) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Players",
+            values = listOf(3, 4, 5, 6, 7),
+            selected = options.playerCount,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(playerCount = it)) },
+        )
+        ChipRow(
+            label = "Rounds",
+            values = listOf(3, 5, 7),
+            selected = options.roundsToPlay,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(roundsToPlay = it)) },
+        )
+        ToggleRow(
+            title = "Twos clear the pile",
+            subtitle = "A two beats anything and takes the pile down",
+            checked = options.twosClear,
+            onChange = { onChange(options.copy(twosClear = it)) },
+        )
+        ToggleRow(
+            title = "Four of a kind bombs",
+            subtitle = "Four matching cards beat anything, whatever the pile",
+            checked = options.fourOfAKindBomb,
+            onChange = { onChange(options.copy(fourOfAKindBomb = it)) },
+        )
+        ToggleRow(
+            title = "Card exchange",
+            subtitle = "After each round the Scum hands their best cards to the President",
+            checked = options.cardExchange,
+            onChange = { onChange(options.copy(cardExchange = it)) },
+        )
+    }
+}
+
+@Composable
+private fun GolfOptionsEditor(options: GolfOptions, onChange: (GolfOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Players",
+            values = listOf(2, 3, 4, 5, 6),
+            selected = options.playerCount,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(playerCount = it)) },
+        )
+        ChipRow(
+            label = "Cards each",
+            values = listOf(4, 6, 9),
+            selected = options.gridSize,
+            display = { "$it" },
+            onSelect = { size ->
+                // Keep the opening reveals inside the new grid.
+                onChange(
+                    options.copy(
+                        gridSize = size,
+                        startingReveals = options.startingReveals.coerceAtMost(size),
+                    )
+                )
+            },
+        )
+        ChipRow(
+            label = "Holes",
+            values = listOf(3, 6, 9),
+            selected = options.holes,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(holes = it)) },
+        )
+        ChipRow(
+            label = "Seen at the start",
+            values = (0..options.gridSize).toList(),
+            selected = options.startingReveals,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(startingReveals = it)) },
+        )
+        Text(
+            text = "${options.rows} rows of ${options.cols}. Matching columns cancel out" +
+                if (options.gridSize == 9) ", and so do matching rows." else ".",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
 private fun <T> ChipRow(
     label: String,
     values: List<T>,
@@ -207,7 +309,12 @@ private fun <T> ChipRow(
 ) {
     Column {
         Text(label, style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Wraps rather than running off the edge: some of these rows carry ten
+        // chips, and a chip you cannot see is a setting you cannot change.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             values.forEach { value ->
                 FilterChip(
                     selected = value == selected,
