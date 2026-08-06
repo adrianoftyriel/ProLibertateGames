@@ -111,6 +111,22 @@ Requires JDK 17 and the Android SDK (compileSdk 34).
   publishes it as a GitHub Release tagged `v1.0.<run-number>`. The in-app updater
   reads that tag, which is why the APK's `versionCode` is the same run number.
 
+### Installing without the app
+
+The newest production build is always at this link, which never changes:
+
+**https://github.com/adrianoftyriel/ProLibertateGames/releases/latest/download/ProLibertateGames.apk**
+
+Every release carries the same APK twice — once named for its version, and once
+as plain `ProLibertateGames.apk`, because GitHub's `/releases/latest/download/`
+redirect needs a file name that stays put. The in-app updater deliberately picks
+the versioned copy, so an installed build can always be traced back to its tag.
+
+There is no equivalent link for the dev channel: `/releases/latest` skips
+prereleases by design, and that is exactly what keeps a production install from
+being handed a dev build. Dev builds are reached through the in-app updater with
+the channel set to dev, or from the releases page.
+
 ### Update channels
 
 Both pipelines publish, to two separate channels:
