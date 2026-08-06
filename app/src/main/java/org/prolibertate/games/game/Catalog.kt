@@ -161,7 +161,7 @@ object GameCatalog {
             teamBased = true,
             blurb = "Lay river tiles out from the centre. Reach both your edges, " +
                 "because your score multiplies them.",
-            available = false,
+            available = true,
         ),
     )
 

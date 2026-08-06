@@ -59,6 +59,7 @@ class CatalogTest {
                 GameCatalog.CRAZY_EIGHTS,
                 GameCatalog.WIZARD,
                 GameCatalog.CHESS,
+                GameCatalog.TAYU,
             ),
             GameCatalog.playable.map { it.id }.toSet(),
         )

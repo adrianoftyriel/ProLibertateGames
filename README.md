@@ -5,12 +5,12 @@ or against other people over Wi-Fi (LAN) or Bluetooth.
 
 ## What works today
 
-The app shell is complete and eight games are playable end to end:
+The app shell is complete and nine games are playable end to end:
 
 | | |
 | --- | --- |
-| **Playable** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s, Sequence, Chess |
-| **Listed, not yet implemented** | Mastermind, Backgammon, Checkers, Ta Yü |
+| **Playable** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s, Sequence, Chess, Ta Yü |
+| **Listed, not yet implemented** | Mastermind, Backgammon, Checkers |
 
 Unimplemented games appear in the menu marked *Coming soon* **on dev builds
 only** — a production release lists just the games that can actually be played,
@@ -93,6 +93,11 @@ always square and sized to fit whatever is left after the hand, and card widths
 are a fraction of the smaller screen dimension. Rotation is handled inside the
 activity, so a hand is not lost when the device turns.
 
+The Ta Yü board is the tightest fit of the lot — 18 × 18 cells comes out under
+20dp a cell on a phone — which is why laying a tile there is a tap to line the
+placement up and a button to commit it, rather than a single tap on a target
+smaller than a fingertip.
+
 ## Building
 
 ```sh
@@ -170,9 +175,9 @@ game:
 - [Wizard](docs/RULES-wizard.md)
 - [Crazy 8s](docs/RULES-crazy8s.md)
 - [Chess](docs/RULES-chess.md)
-- [Ta Yü](docs/RULES-tayu.md) — **not implemented yet**: this one is the
-  specification the engine will be written against, and it says which parts of
-  the out-of-print rulebook had to be reconstructed
+- [Ta Yü](docs/RULES-tayu.md) — **note the caveats about the reconstruction**:
+  the game is out of print and the rulebook could not be obtained, so the
+  document says which parts are attested and which were derived
 
 ## Layout
 
@@ -188,6 +193,7 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
   wizard/      Wizard model, rules, AI
   crazyeights/ Crazy 8s model, rules, AI
   chess/       Chess model, FEN, move generation, search
+  tayu/        Ta Yü tile geometry, river rules, scoring, AI
 net/           wire protocol, LAN and Bluetooth transports, lobby, match driver
 settings/      DataStore-backed preferences
 update/        GitHub Releases OTA updater

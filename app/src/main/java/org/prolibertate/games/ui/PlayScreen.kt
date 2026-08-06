@@ -40,6 +40,10 @@ import org.prolibertate.games.game.sequence.SequenceAi
 import org.prolibertate.games.game.sequence.SequenceMove
 import org.prolibertate.games.game.sequence.SequenceRules
 import org.prolibertate.games.game.sequence.SequenceState
+import org.prolibertate.games.game.tayu.TayuAi
+import org.prolibertate.games.game.tayu.TayuMove
+import org.prolibertate.games.game.tayu.TayuRules
+import org.prolibertate.games.game.tayu.TayuState
 import org.prolibertate.games.game.wizard.WizardAi
 import org.prolibertate.games.game.wizard.WizardMove
 import org.prolibertate.games.game.wizard.WizardPhase
@@ -55,6 +59,7 @@ import org.prolibertate.games.ui.game.KaiserScreen
 import org.prolibertate.games.ui.game.PresidentScreen
 import org.prolibertate.games.ui.game.TRICK_HOLD_MILLIS
 import org.prolibertate.games.ui.game.SequenceScreen
+import org.prolibertate.games.ui.game.TayuScreen
 import org.prolibertate.games.ui.game.WizardScreen
 
 /**
@@ -276,6 +281,25 @@ fun PlayScreen(
             }
             StartMatch(env, controller, route)
             CrazyEightsScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.TAYU -> {
+            val controller = remember(route) {
+                MatchController<TayuState, TayuMove>(
+                    rules = TayuRules,
+                    // As with chess, the strength is part of the table's own
+                    // options, so this does not have to decode anything.
+                    ai = TayuAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    aiThinkingMillis = { settings.scaled(700L) },
+                )
+            }
+            StartMatch(env, controller, route)
+            TayuScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
         }
 
         GameCatalog.CHESS -> {
