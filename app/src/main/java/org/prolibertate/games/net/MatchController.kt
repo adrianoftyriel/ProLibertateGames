@@ -71,7 +71,21 @@ class MatchController<S : Any, M : Any>(
     val finished: StateFlow<Boolean> = _finished.asStateFlow()
 
     private val _notice = MutableStateFlow<String?>(null)
+
+    /** A passing remark about the last thing that happened, such as a refused move. */
     val notice: StateFlow<String?> = _notice.asStateFlow()
+
+    private val _abandoned = MutableStateFlow<String?>(null)
+
+    /**
+     * Why this table can no longer be played, or null while it still can.
+     *
+     * Kept apart from [notice] because the two want opposite treatment: a
+     * refused move is worth a word in passing, whereas a game with nobody left
+     * to play it has to be brought to the player's attention along with the way
+     * out of it.
+     */
+    val abandoned: StateFlow<String?> = _abandoned.asStateFlow()
 
     private val _awaitingConfirmation = MutableStateFlow(false)
 
@@ -91,6 +105,21 @@ class MatchController<S : Any, M : Any>(
     private val seatPeers: Map<Int, String?> =
         config.seats.associate { it.seat to it.peerId }
 
+    private fun nameOfPeer(peerId: String): String =
+        config.seats.firstOrNull { it.peerId == peerId }?.name ?: "The other player"
+
+    /**
+     * Records that this table cannot be played any further.
+     *
+     * Set on both channels on purpose: screens that show [notice] as a line of
+     * text carry on doing so, and one that wants to stop the player and offer
+     * the way out reads [abandoned] instead.
+     */
+    private fun abandon(reason: String) {
+        _notice.value = reason
+        _abandoned.value = reason
+    }
+
     // -----------------------------------------------------------------------
     // Start-up
     // -----------------------------------------------------------------------
@@ -105,8 +134,15 @@ class MatchController<S : Any, M : Any>(
             }
         }
         scope.launch {
+            val initial = runCatching { rules.initialState(config) }.getOrElse { error ->
+                // A table the rules will not accept is a dead end, not a reason
+                // to take the app down with it: this runs in the screen's own
+                // scope, where nothing would catch it.
+                abandon("This table could not be set up: ${error.message}")
+                return@launch
+            }
             lock.withLock {
-                authoritative = rules.initialState(config)
+                authoritative = initial
                 publish()
             }
             driveIdleSeats()
@@ -121,13 +157,30 @@ class MatchController<S : Any, M : Any>(
             link.incoming.collect { message ->
                 when (message) {
                     is StateSync -> {
-                        _state.value = rules.decodeState(message.stateJson)
-                        _legalMoves.value = message.legalMoves.map { rules.decodeMove(it) }
-                        _finished.value = _state.value?.let { rules.isFinished(it) } ?: false
+                        // Anything off the wire is decoded defensively. This
+                        // collector runs in the screen's own scope, so throwing
+                        // here would take the app down rather than the message.
+                        val decoded = runCatching {
+                            val state = rules.decodeState(message.stateJson)
+                            state to message.legalMoves.map { rules.decodeMove(it) }
+                        }.getOrNull()
+                        if (decoded == null) {
+                            _notice.value = "The host sent something this version cannot read."
+                            return@collect
+                        }
+                        _state.value = decoded.first
+                        _legalMoves.value = decoded.second
+                        _finished.value = rules.isFinished(decoded.first)
                     }
 
                     is Rejected -> _notice.value = message.reason
-                    is Bye -> _notice.value = "The host left the game."
+                    is Bye -> {
+                        // The host has gone: the game cannot go on, and saying so
+                        // is what gives the screen something to offer a way out of.
+                        _legalMoves.value = emptyList()
+                        abandon("The host left the game.")
+                    }
+
                     else -> Unit
                 }
             }
@@ -156,6 +209,13 @@ class MatchController<S : Any, M : Any>(
     }
 
     private suspend fun onHostMessage(connection: Connection, message: NetMessage) {
+        if (message is Bye) {
+            // One of the players has left. The host keeps the position — there is
+            // nothing wrong with it — but a table that cannot go on should say so
+            // rather than leave somebody waiting on a move that is not coming.
+            abandon("${nameOfPeer(connection.peerId)} left the game.")
+            return
+        }
         if (message !is MoveIntent) return
         val seat = seatPeers.entries.firstOrNull { it.value == connection.peerId }?.key
         if (seat == null) {
@@ -244,13 +304,21 @@ class MatchController<S : Any, M : Any>(
             val applied = lock.withLock {
                 val live = authoritative ?: return
                 // Nothing else can move while an AI seat is on the clock, but
-                // the state is re-read rather than assumed.
+                // the state is re-read rather than assumed. The move was chosen
+                // off this thread and a chess search takes seconds, so it is
+                // checked against the position as it stands now: applyMove
+                // throws on a move that is no longer legal, and there is nothing
+                // above this to catch it.
                 if (rules.currentSeat(live) != seat) return@withLock false
+                if (move !in rules.legalMoves(live, seat)) return@withLock false
                 authoritative = rules.applyMove(live, seat, move)
                 publish()
                 true
             }
-            if (!applied) return
+            // The position moved on under the search. Go round again and pick a
+            // move for the position as it now stands; the loop returns on its own
+            // as soon as a person is on the clock.
+            if (!applied) continue
         }
     }
 
@@ -299,6 +367,15 @@ class MatchController<S : Any, M : Any>(
         scope.launch { driveIdleSeats() }
     }
 
+    /** Lets a player go on looking at a table they have been told is over. */
+    fun dismissAbandoned() {
+        _abandoned.value = null
+    }
+
+    /**
+     * Lets go of every link. Safe on the thread drawing the screen — see
+     * [StreamConnection.close], which this leans on to not block.
+     */
     fun close() {
         peers.values.forEach { runCatching { it.close() } }
         peers.clear()

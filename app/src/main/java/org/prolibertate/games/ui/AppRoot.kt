@@ -86,12 +86,23 @@ fun AppRoot(env: AppEnv) {
 
     val pop: () -> Unit = {
         if (stack.size > 1) {
+            val leaving = stack.last()
             // Leaving a lobby or a table tears the networking down with it.
-            when (stack.last()) {
+            when (leaving) {
                 is Route.Lobby, is Route.Play -> env.lobby.stop()
                 else -> Unit
             }
-            stack = stack.dropLast(1)
+            stack = stack.dropLast(1).let { remaining ->
+                // Leaving a table must not land back in the lobby that started
+                // it. A lobby starts advertising the moment it is drawn, so
+                // ending a game would have put the player straight into another
+                // one — which is no way to leave a game.
+                if (leaving is Route.Play) {
+                    remaining.dropLastWhile { it is Route.Lobby }
+                } else {
+                    remaining
+                }
+            }
         }
     }
 
