@@ -41,6 +41,32 @@ Each client is then sent a state **redacted for its own seat**, so opponents'
 hands and the deck order are never transmitted to devices that should not see
 them.
 
+## Scorekeeper
+
+**Scorekeeper** on the main menu is a pencil for games the app does not deal —
+darts, cribbage, whatever is actually on the table. Say how many are playing,
+name them, and write down what each of them scored every round; the running
+tally sits at the foot of the screen, where the one number anybody looks up is
+always visible.
+
+Players can be renamed, added, removed or **dragged into a different order** at
+any point in a game. That works because points are recorded against a player's
+id rather than their position, so reordering the sheet moves the columns and
+nothing else. Ids are handed out once and never reused: somebody sitting down
+where somebody else got up starts at nought instead of inheriting a stranger's
+score. Removing a player does take their points with them — a score nobody can
+see is a score nobody can correct.
+
+Rounds are not written in ink. Tapping one reopens it for correction or lets it
+be struck out, and the totals follow.
+
+The sheet is saved as it is edited, so leaving the app or taking a phone call
+does not lose the game. It is kept in its own DataStore rather than with the
+settings, because it is a game in progress rather than a preference.
+
+`score/ScoreSheet.kt` holds the whole model and, like `game/`, has no Android in
+it: every rule above is a pure function and unit-tested on the JVM.
+
 ## Settings
 
 - **Sound** on/off.
@@ -247,6 +273,7 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
   chess/       Chess model, FEN, move generation, search
   tayu/        Ta Yü tile geometry, river rules, scoring, AI
 net/           wire protocol, LAN transport, lobby, match driver
+score/         scorekeeper sheet — pure Kotlin, unit-tested — and its store
 settings/      DataStore-backed preferences
 update/        GitHub Releases OTA updater
 ui/            Compose screens
