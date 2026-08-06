@@ -2,8 +2,14 @@ name: CI
 
 # Pre-merge checks. Runs on the dev branch and on every pull request aimed at
 # dev or main, so breakage is caught before it reaches main and triggers a
-# release. Builds the same debug APK as the release pipeline, but publishes it
-# only as a workflow artifact — no tag, no GitHub Release.
+# release.
+#
+# On a push to dev it also publishes the build as a dev-channel prerelease, so
+# the in-app updater can offer it to anyone who has switched to that channel.
+# Prereleases are used deliberately: GitHub's "latest release" endpoint skips
+# them, so a production-channel user never sees a dev build. Pull requests only
+# build and check — they never publish, which keeps a PR from a fork from
+# shipping anything.
 on:
   push:
     branches: [ dev ]
@@ -11,8 +17,9 @@ on:
     branches: [ main, dev ]
   workflow_dispatch:
 
+# Needed to publish the dev-channel prerelease below.
 permissions:
-  contents: read
+  contents: write
 
 # A newer push to the same branch or PR makes the in-flight run obsolete.
 concurrency:
@@ -23,6 +30,11 @@ jobs:
   build:
     name: Build and check
     runs-on: ubuntu-latest
+    env:
+      # Stamp the APK as a dev-channel build only when this is a real push to
+      # dev. Pull request builds stay unstamped at 1.0.0-dev, since they are
+      # never published and must not claim a channel version.
+      PLG_CHANNEL: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/dev') && 'dev' || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,3 +76,35 @@ jobs:
             app/build/reports/
           if-no-files-found: ignore
           retention-days: 14
+
+      # Everything below publishes the dev channel, and only ever from a push
+      # to dev that has already built, tested and linted clean above.
+      - name: Stage dev APK
+        id: stage
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        run: |
+          set -euo pipefail
+          version="v1.0.${{ github.run_number }}-dev"
+          src="app/build/outputs/apk/debug/app-debug.apk"
+          dest="ProLibertateGames-${version}.apk"
+          cp "$src" "$dest"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "apk=$dest" >> "$GITHUB_OUTPUT"
+
+      - name: Publish dev channel prerelease
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${{ steps.stage.outputs.version }}" \
+            "${{ steps.stage.outputs.apk }}" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "ProLibertateGames ${{ steps.stage.outputs.version }}" \
+            --prerelease \
+            --notes "Automated **dev channel** build from \`${{ github.sha }}\` on \`dev\`.
+
+          Preview build: newer than production, and less tested. Switch to the
+          Dev update channel in Settings to be offered these. Marked as a
+          prerelease so production-channel installs never see it."

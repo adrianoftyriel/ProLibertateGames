@@ -48,6 +48,13 @@ import org.prolibertate.games.ui.theme.FeltGreenDark
 import org.prolibertate.games.ui.theme.TeamColours
 
 /**
+ * Outline for a square the selected card can be played on. Deliberately not a
+ * theme colour: it must contrast with both team chip colours and with the
+ * board in either light or dark mode.
+ */
+private val HighlightAmber = Color(0xFFFFC107)
+
+/**
  * The Sequence board.
  *
  * The board is always square and always fits: its side is the smaller of the
@@ -191,8 +198,16 @@ private fun BoardCell(
             .clip(RoundedCornerShape(size * 0.12f))
             .background(if (card == null) MaterialTheme.colorScheme.primary else Color.White)
             .border(
-                width = if (highlighted) 2.dp else 0.5.dp,
-                color = if (highlighted) MaterialTheme.colorScheme.tertiary else Color(0x33000000),
+                // Playable squares are outlined heavily rather than tinted: the
+                // outline has to read against a white card, a green corner and
+                // a chip sitting on top of it. Scaled off the cell so it stays
+                // visible on a small screen without swamping a large one.
+                width = if (highlighted) {
+                    (size * 0.10f).coerceIn(3.dp, 6.dp)
+                } else {
+                    0.5.dp
+                },
+                color = if (highlighted) HighlightAmber else Color(0x33000000),
                 shape = RoundedCornerShape(size * 0.12f),
             )
             .clickable { onClick() },
