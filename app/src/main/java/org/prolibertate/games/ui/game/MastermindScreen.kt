@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -37,6 +38,7 @@ import org.prolibertate.games.game.mastermind.Feedback
 import org.prolibertate.games.game.mastermind.Guess
 import org.prolibertate.games.game.mastermind.MastermindMove
 import org.prolibertate.games.game.mastermind.MastermindPhase
+import org.prolibertate.games.game.mastermind.MastermindRules
 import org.prolibertate.games.game.mastermind.MastermindState
 import org.prolibertate.games.game.mastermind.other
 import org.prolibertate.games.net.MatchController
@@ -66,13 +68,13 @@ private val ExactPeg = Color(0xFF212121)
 private val MisplacedPeg = Color(0xFFFFFFFF)
 
 /**
- * Mastermind, played as a duel: both players are guarding a code and breaking
- * one, a guess each in turn.
+ * Mastermind, played as a duel: each player sets the code their opponent will
+ * have to break, and then both are breaking one, a guess each in turn.
  *
- * Tap the colours to build a guess and press the button to commit it. The
- * answer to each guess is the little pegs beside it — a black one for a colour
- * in the right place, a white one for a colour in the wrong place, and no
- * indication whatever of which is which.
+ * The same row of pegs does both jobs — tap the colours to build it, and the
+ * button says which one you are doing. The answer to each guess is the little
+ * pegs beside it: a dark one for a colour in the right place, a light one for a
+ * colour in the wrong place, and no indication whatever of which is which.
  */
 @Composable
 fun MastermindScreen(
@@ -100,7 +102,12 @@ fun MastermindScreen(
         return
     }
 
-    val yourTurn = current.turn == localSeat && current.phase == MastermindPhase.GUESSING
+    val setting = current.phase == MastermindPhase.SETTING
+    val yourTurn = current.turn == localSeat && current.phase != MastermindPhase.GAME_OVER
+    // A row has to be a code this table allows — which on a no-repeats table
+    // rules out a repeated colour — and a guess may not be one already made.
+    val readyToSend = MastermindRules.isWellFormed(current.options, building.toList()) &&
+        (setting || current.guesses[localSeat].none { it.code == building.toList() })
 
     ScreenScaffold(title = TITLE, onBack = onExit, actions = endGameAction) { modifier ->
         Column(
@@ -110,26 +117,53 @@ fun MastermindScreen(
             Text(
                 text = when {
                     current.outcome != null -> current.outcome!!.label
+                    setting && yourTurn -> "Set the code they will have to break"
+                    setting -> "Waiting for them to set theirs…"
                     yourTurn -> "Your guess — ${current.guessesLeft(localSeat)} left"
                     else -> "Thinking…"
                 },
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "A dark peg is a colour in the right place, a light one a colour " +
-                    "somewhere else. Which is which is for you to work out.",
+                text = if (setting) {
+                    "Choose any code the table allows. They will not see it, and you " +
+                        "will be breaking the one they choose for you."
+                } else {
+                    "A dark peg is a colour in the right place, a light one a colour " +
+                        "somewhere else. Which is which is for you to work out."
+                },
                 style = MaterialTheme.typography.bodySmall,
             )
 
-            Text("Your guesses", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            GuessList(current, localSeat)
+            if (setting) {
+                // Nothing has been guessed yet, so the only thing worth showing
+                // is whether the other player is ready.
+                Text(
+                    text = if (current.hasSet(other(localSeat))) {
+                        "They have set theirs."
+                    } else {
+                        "They have not set theirs yet."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                Text(
+                    text = "Your guesses",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                GuessList(current, localSeat)
+            }
 
-            if (current.phase == MastermindPhase.GUESSING) {
+            if (current.phase != MastermindPhase.GAME_OVER) {
                 Builder(
                     length = current.options.length,
                     colours = current.options.colours,
+                    allowDuplicates = current.options.allowDuplicates,
                     building = building,
                     enabled = yourTurn,
+                    label = if (setting) "Set this code" else "Guess",
+                    ready = readyToSend,
                     onSubmit = {
                         controller.submit(MastermindMove(building.toList()))
                         building.clear()
@@ -137,23 +171,25 @@ fun MastermindScreen(
                 )
             }
 
-            Text(
-                text = "Against you",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-            Text(
-                text = "${current.guesses[other(localSeat)].size} guesses at your code so far.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            GuessList(current, other(localSeat))
+            if (!setting) {
+                Text(
+                    text = "Against you",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Text(
+                    text = "${current.guesses[other(localSeat)].size} guesses at your code so far.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                GuessList(current, other(localSeat))
+            }
 
-            // Your own code, which is yours to see all along — you are guarding
-            // it, not guessing it.
+            // Your own code, which is yours to see all along — you chose it, and
+            // you are guarding it rather than guessing it.
             if (current.secrets[localSeat].isNotEmpty()) {
                 Text(
-                    text = "The code you are guarding",
+                    text = "The code you set",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(top = 8.dp),
@@ -262,8 +298,11 @@ private fun FeedbackPegs(feedback: Feedback, length: Int) {
 private fun Builder(
     length: Int,
     colours: Int,
+    allowDuplicates: Boolean,
     building: MutableList<Int>,
     enabled: Boolean,
+    label: String,
+    ready: Boolean,
     onSubmit: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -287,8 +326,14 @@ private fun Builder(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             repeat(colours) { colour ->
+                // On a table without repeats, a colour already down is not a
+                // colour you can put down again — greyed rather than merely
+                // refused, so it never comes as a surprise.
+                val spent = !allowDuplicates && colour in building
                 Box(
-                    modifier = Modifier.clickable(enabled = enabled && building.size < length) {
+                    modifier = Modifier.alpha(if (spent) 0.3f else 1f).clickable(
+                        enabled = enabled && !spent && building.size < length,
+                    ) {
                         building.add(colour)
                     }
                 ) {
@@ -298,8 +343,8 @@ private fun Builder(
         }
 
         PrimaryAction(
-            text = "Guess",
-            enabled = enabled && building.size == length,
+            text = label,
+            enabled = enabled && ready,
             onClick = onSubmit,
         )
     }
