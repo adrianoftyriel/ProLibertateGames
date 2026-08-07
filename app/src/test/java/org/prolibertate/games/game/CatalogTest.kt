@@ -26,12 +26,25 @@ class CatalogTest {
     }
 
     @Test
-    fun `a dev build lists everything including what is still coming`() {
+    fun `a dev build lists the whole catalogue`() {
         val shown = GameCategory.entries.flatMap {
             GameCatalog.byCategory(it, includeComingSoon = true)
         }
         assertEquals(GameCatalog.all.size, shown.size)
-        assertTrue("unfinished games are visible while developing", shown.any { !it.available })
+    }
+
+    @Test
+    fun `every game in the catalogue can be played`() {
+        // There is nothing left marked "coming soon". The machinery that hides
+        // unfinished games from a production build is still there and still
+        // tested above — it simply has nothing to hide at the moment, and this
+        // is what will fail the day something is added to the list before its
+        // engine is written.
+        assertTrue(GameCatalog.all.all { it.available })
+        assertEquals(
+            GameCatalog.byCategory(GameCategory.BOARD, includeComingSoon = false),
+            GameCatalog.byCategory(GameCategory.BOARD, includeComingSoon = true),
+        )
     }
 
     @Test
@@ -61,6 +74,10 @@ class CatalogTest {
                 GameCatalog.CHESS,
                 GameCatalog.TAYU,
                 GameCatalog.MORRIS,
+                GameCatalog.CHECKERS,
+                GameCatalog.MASTERMIND,
+                GameCatalog.BACKGAMMON,
+                GameCatalog.PIRATES,
             ),
             GameCatalog.playable.map { it.id }.toSet(),
         )

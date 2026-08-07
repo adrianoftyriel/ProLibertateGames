@@ -40,6 +40,7 @@ object GameCatalog {
     const val CHECKERS = "checkers"
     const val TAYU = "tayu"
     const val MORRIS = "morris"
+    const val PIRATES = "pirates"
 
     val all: List<GameDescriptor> = listOf(
         GameDescriptor(
@@ -119,8 +120,9 @@ object GameCatalog {
             minPlayers = 2,
             maxPlayers = 2,
             teamBased = false,
-            blurb = "Break the hidden code from black and white peg clues.",
-            available = false,
+            blurb = "Break the hidden code from black and white peg clues. " +
+                "Both players get one, and whoever cracks theirs first wins.",
+            available = true,
         ),
         GameDescriptor(
             id = BACKGAMMON,
@@ -130,7 +132,7 @@ object GameCatalog {
             maxPlayers = 2,
             teamBased = false,
             blurb = "Race your checkers home, and hit your opponent on the way.",
-            available = false,
+            available = true,
         ),
         GameDescriptor(
             id = CHESS,
@@ -150,7 +152,7 @@ object GameCatalog {
             maxPlayers = 2,
             teamBased = false,
             blurb = "Forced captures, kings, and the long diagonal.",
-            available = false,
+            available = true,
         ),
         GameDescriptor(
             id = MORRIS,
@@ -160,6 +162,17 @@ object GameCatalog {
             maxPlayers = 2,
             teamBased = false,
             blurb = "Three in a row takes a piece. Reduce them to two and the game is yours.",
+            available = true,
+        ),
+        GameDescriptor(
+            id = PIRATES,
+            title = "Pirates and Bulgars",
+            category = GameCategory.BOARD,
+            minPlayers = 2,
+            maxPlayers = 2,
+            teamBased = false,
+            blurb = "Two pirates hold the stronghold against twenty-four Bulgars. " +
+                "Only one side can take pieces, and it is not the big one.",
             available = true,
         ),
         GameDescriptor(

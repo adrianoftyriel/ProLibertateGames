@@ -5,20 +5,23 @@ or against other people over Wi-Fi (LAN).
 
 ## What works today
 
-The app shell is complete and ten games are playable end to end:
+The app shell is complete and every game in the catalogue is playable end to end:
 
 | | |
 | --- | --- |
-| **Playable** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s, Sequence, Chess, Ta Yü, Nine Men's Morris |
-| **Listed, not yet implemented** | Mastermind, Backgammon, Checkers, Pirates and Bulgars |
+| **Cards** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s |
+| **Board** | Sequence, Chess, Checkers, Backgammon, Mastermind, Nine Men's Morris, Pirates and Bulgars, Ta Yü |
 
-Unimplemented games appear in the menu marked *Coming soon* **on dev builds
-only** — a production release lists just the games that can actually be played,
-so nobody installs it and taps into a dead end. The menu decides this from the
-installed APK's own version name, so it follows the build rather than the
-channel selected for future updates. Adding one means
-writing a `GameRules` implementation, a `GameAi`, and a screen, then flipping
-`available` in `GameCatalog` — the menu, lobby, networking, settings and OTA
+Nothing is marked *Coming soon* at the moment, because nothing is waiting. The
+machinery for it is still there and still tested: a game listed in `GameCatalog`
+with `available = false` appears in the menu marked *Coming soon* **on dev builds
+only**, so a production release lists just what can actually be played and nobody
+installs it and taps into a dead end. The menu decides this from the installed
+APK's own version name, so it follows the build rather than the channel selected
+for future updates.
+
+Adding a game means writing a `GameRules` implementation, a `GameAi` and a
+screen, then flipping `available` — the menu, lobby, networking, settings and OTA
 layers are game-agnostic and need no changes.
 
 ## Playing with other people
@@ -269,7 +272,14 @@ game:
 - [Wizard](docs/RULES-wizard.md)
 - [Crazy 8s](docs/RULES-crazy8s.md)
 - [Chess](docs/RULES-chess.md)
+- [Checkers](docs/RULES-checkers.md) — **note the caveat about flying kings**
+- [Backgammon](docs/RULES-backgammon.md) — **note that there is no doubling cube**
+- [Mastermind](docs/RULES-mastermind.md) — played as a duel, both players
+  guarding a code and breaking one
 - [Nine Men's Morris](docs/RULES-morris.md)
+- [Pirates and Bulgars](docs/RULES-pirates.md) — **note the caveats about the
+  reconstruction**: the book the theme comes from could not be obtained, so the
+  document says which rules are attested and which were chosen
 - [Ta Yü](docs/RULES-tayu.md) — **note the caveats about the reconstruction**:
   the game is out of print and the rulebook could not be obtained, so the
   document says which parts are attested and which were derived
@@ -289,6 +299,10 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
   crazyeights/ Crazy 8s model, rules, AI
   chess/       Chess model, FEN, move generation, search
   morris/      Nine Men's Morris board geometry, mills, rules, search
+  checkers/    Checkers board, compulsory captures, crowning, search
+  backgammon/  Backgammon points, dice, the maximal-roll rule, turn search
+  mastermind/  Mastermind codes, scoring, and a code breaker
+  pirates/     Pirates and Bulgars — the cross board, the hunt, search
   tayu/        Ta Yü tile geometry, river rules, scoring, AI
 net/           wire protocol, LAN transport, lobby, match driver
 score/         scorekeeper sheet — pure Kotlin, unit-tested — and its store
