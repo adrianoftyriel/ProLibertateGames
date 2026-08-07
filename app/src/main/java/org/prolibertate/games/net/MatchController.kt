@@ -98,6 +98,18 @@ class MatchController<S : Any, M : Any>(
     private val lock = Mutex()
     private var sequence = 0
 
+    /**
+     * A scoreboard a player has read and released, waiting to be let past.
+     *
+     * The hold belongs to a particular scoreboard rather than to the phase, and
+     * releasing it has to be spent: [awaitsConfirmation] is asked about the
+     * state, which has not changed while the players were reading it, so
+     * without something consumable here the same state would stop the table
+     * again the instant [confirmAdvance] restarted the loop — and the next hand
+     * would never be dealt.
+     */
+    private var released = false
+
     private val peers = mutableMapOf<String, Connection>()
     private var hostLink: Connection? = null
 
@@ -288,8 +300,15 @@ class MatchController<S : Any, M : Any>(
                 if (role == Role.HOST && awaitsConfirmation(current)) {
                     // Hold here until a player has read the scoreboard. Only the
                     // host waits; clients simply render what they were sent.
-                    _awaitingConfirmation.value = true
-                    return
+                    val letThrough = lock.withLock {
+                        val granted = released
+                        released = false
+                        granted
+                    }
+                    if (!letThrough) {
+                        _awaitingConfirmation.value = true
+                        return
+                    }
                 }
                 delay(aiThinkingMillis() * 2)
                 val advanced = advanceIdle(current)
@@ -398,7 +417,10 @@ class MatchController<S : Any, M : Any>(
         if (!_awaitingConfirmation.value) return
         _awaitingConfirmation.value = false
         if (role != Role.HOST) return
-        scope.launch { driveIdleSeats() }
+        scope.launch {
+            lock.withLock { released = true }
+            driveIdleSeats()
+        }
     }
 
     /** Lets a player go on looking at a table they have been told is over. */
