@@ -9,7 +9,7 @@ The app shell is complete and every game in the catalogue is playable end to end
 
 | | |
 | --- | --- |
-| **Cards** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s |
+| **Cards** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s, Cribbage |
 | **Board** | Sequence, Chess, Checkers, Backgammon, Mastermind, Nine Men's Morris, Pirates and Bulgars, Ta Yü |
 
 Nothing is marked *Coming soon* at the moment, because nothing is waiting. The
@@ -47,7 +47,7 @@ them.
 ## Scorekeeper
 
 **Scorekeeper** on the main menu is a pencil for games the app does not deal —
-darts, cribbage, whatever is actually on the table. It is laid out as the paper
+darts, rummy, whatever is actually on the table. It is laid out as the paper
 it replaces: a column per player with their name at the head, a row per round
 running down the page, and the running total ruled off at the foot.
 
@@ -292,6 +292,8 @@ game:
 - [Golf](docs/RULES-golf.md)
 - [Wizard](docs/RULES-wizard.md)
 - [Crazy 8s](docs/RULES-crazy8s.md)
+- [Cribbage](docs/RULES-cribbage.md) — two, three or four, and **note that four
+  play in partnerships pegging on one score**
 - [Chess](docs/RULES-chess.md)
 - [Checkers](docs/RULES-checkers.md) — **note the caveat about flying kings**
 - [Backgammon](docs/RULES-backgammon.md) — **note that there is no doubling cube**
@@ -318,6 +320,7 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
   golf/        Golf model, scoring, rules, AI
   wizard/      Wizard model, rules, AI
   crazyeights/ Crazy 8s model, rules, AI
+  cribbage/    Cribbage the crib, the play, the show, and a counting AI
   chess/       Chess model, FEN, move generation, search
   morris/      Nine Men's Morris board geometry, mills, rules, search
   checkers/    Checkers board, compulsory captures, crowning, search
