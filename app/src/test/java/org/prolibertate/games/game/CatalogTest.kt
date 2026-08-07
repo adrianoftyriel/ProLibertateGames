@@ -70,6 +70,7 @@ class CatalogTest {
                 GameCatalog.GOLF,
                 GameCatalog.KAISER,
                 GameCatalog.CRAZY_EIGHTS,
+                GameCatalog.CRIBBAGE,
                 GameCatalog.WIZARD,
                 GameCatalog.CHESS,
                 GameCatalog.TAYU,

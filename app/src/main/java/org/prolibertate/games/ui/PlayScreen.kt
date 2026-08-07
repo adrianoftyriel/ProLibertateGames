@@ -16,6 +16,11 @@ import org.prolibertate.games.game.crazyeights.CrazyEightsMove
 import org.prolibertate.games.game.crazyeights.CrazyEightsPhase
 import org.prolibertate.games.game.crazyeights.CrazyEightsRules
 import org.prolibertate.games.game.crazyeights.CrazyEightsState
+import org.prolibertate.games.game.cribbage.CribbageAi
+import org.prolibertate.games.game.cribbage.CribbageMove
+import org.prolibertate.games.game.cribbage.CribbagePhase
+import org.prolibertate.games.game.cribbage.CribbageRules
+import org.prolibertate.games.game.cribbage.CribbageState
 import org.prolibertate.games.game.euchre.EuchreAi
 import org.prolibertate.games.game.euchre.EuchreMove
 import org.prolibertate.games.game.euchre.EuchrePhase
@@ -75,6 +80,7 @@ import org.prolibertate.games.ui.game.BackgammonScreen
 import org.prolibertate.games.ui.game.CheckersScreen
 import org.prolibertate.games.ui.game.ChessScreen
 import org.prolibertate.games.ui.game.CrazyEightsScreen
+import org.prolibertate.games.ui.game.CribbageScreen
 import org.prolibertate.games.ui.game.EuchreScreen
 import org.prolibertate.games.ui.game.GolfScreen
 import org.prolibertate.games.ui.game.KaiserScreen
@@ -306,6 +312,33 @@ fun PlayScreen(
             }
             StartMatch(env, controller, route)
             CrazyEightsScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.CRIBBAGE -> {
+            val controller = remember(route) {
+                MatchController<CribbageState, CribbageMove>(
+                    rules = CribbageRules,
+                    ai = CribbageAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    advanceIdle = { state ->
+                        if (state.phase == CribbagePhase.SHOW) {
+                            CribbageRules.nextHand(state)
+                        } else {
+                            null
+                        }
+                    },
+                    // The show is the half of cribbage that is read rather than
+                    // played, so the table stops on it until somebody says go on.
+                    awaitsConfirmation = { state -> state.phase == CribbagePhase.SHOW },
+                    aiThinkingMillis = { settings.scaled(700L) },
+                )
+            }
+            StartMatch(env, controller, route)
+            CribbageScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
         }
 
         GameCatalog.TAYU -> {
