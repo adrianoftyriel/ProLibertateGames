@@ -5,7 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -30,13 +31,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import org.prolibertate.games.R
 import org.prolibertate.games.game.GameCatalog
 import org.prolibertate.games.game.GameCategory
 import org.prolibertate.games.game.GameDescriptor
 import org.prolibertate.games.game.engine.TableConfig
 import org.prolibertate.games.net.LobbyController
+import org.prolibertate.games.score.ScorekeeperRepository
 import org.prolibertate.games.settings.Settings
 import org.prolibertate.games.settings.SettingsRepository
 import org.prolibertate.games.update.UpdateChannel
@@ -47,6 +51,7 @@ class AppEnv(
     val settingsRepository: SettingsRepository,
     val updater: Updater,
     val lobby: LobbyController,
+    val scorekeeper: ScorekeeperRepository,
     val peerId: String,
 )
 
@@ -60,6 +65,7 @@ class AppEnv(
 sealed interface Route {
     data object Menu : Route
     data object Settings : Route
+    data object Scorekeeper : Route
     data class Setup(val gameId: String) : Route
     data class Lobby(val gameId: String, val optionsJson: String, val hosting: Boolean) : Route
     data class Play(
@@ -143,12 +149,18 @@ private fun AppContent(
             showComingSoon = showComingSoon,
             onPickGame = { push(Route.Setup(it.id)) },
             onJoinGame = { push(Route.Lobby(gameId = "", optionsJson = "{}", hosting = false)) },
+            onScorekeeper = { push(Route.Scorekeeper) },
             onSettings = { push(Route.Settings) },
         )
 
         is Route.Settings -> SettingsScreen(
             env = env,
             settings = settings,
+            onBack = { pop() },
+        )
+
+        is Route.Scorekeeper -> ScorekeeperScreen(
+            repository = env.scorekeeper,
             onBack = { pop() },
         )
 
@@ -185,18 +197,21 @@ private fun AppContent(
 // Main menu
 // ---------------------------------------------------------------------------
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MainMenuScreen(
     showComingSoon: Boolean,
     onPickGame: (GameDescriptor) -> Unit,
     onJoinGame: () -> Unit,
+    onScorekeeper: () -> Unit,
     onSettings: () -> Unit,
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pro Libertate Games") },
+                // The installed name rather than a literal, so a dev build says
+                // so in its own title bar as well as in the app drawer.
+                title = { Text(stringResource(R.string.app_name)) },
                 actions = { TextButton(onClick = onSettings) { Text("Settings") } },
             )
         }
@@ -207,11 +222,17 @@ fun MainMenuScreen(
                 .padding(padding)
                 .padding(horizontal = 12.dp),
         ) {
-            Row(
+            // Wraps rather than running off the edge: two buttons and a narrow
+            // phone would otherwise push the second one past the screen.
+            FlowRow(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 OutlinedButton(onClick = onJoinGame) { Text("Join a game nearby") }
+                // Not a game, and deliberately not in the catalogue: it keeps
+                // score for whatever is being played on the actual table.
+                OutlinedButton(onClick = onScorekeeper) { Text("Scorekeeper") }
             }
 
             // The column count follows the available width, so a phone in

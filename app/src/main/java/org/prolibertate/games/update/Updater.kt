@@ -22,6 +22,10 @@ import java.net.URL
  * a production build's is its release run number, and the two are unrelated.
  * Versions are therefore only ever compared *within* a channel; moving between
  * them is treated as an explicit switch rather than an upgrade.
+ *
+ * The two also carry different applicationIds — a dev build installs as
+ * `…games.dev` — so a switch installs the other channel beside this one instead
+ * of over it, and both can be kept on the same device.
  */
 enum class UpdateChannel(val label: String, val blurb: String) {
     PRODUCTION("Production", "Stable builds released from main"),
@@ -53,7 +57,8 @@ class Updater(private val activity: Activity) {
         /**
          * [isChannelSwitch] means this build is from a different channel than
          * the one installed, so it is an explicit move rather than a newer
-         * version of the same line.
+         * version of the same line — and, because the channels have separate
+         * applicationIds, it lands as a second app rather than an upgrade.
          */
         data class Available(val release: Release, val isChannelSwitch: Boolean) : Result
 

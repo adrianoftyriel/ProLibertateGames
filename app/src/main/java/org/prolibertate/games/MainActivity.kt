@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
 import org.prolibertate.games.net.LobbyController
+import org.prolibertate.games.score.ScorekeeperRepository
 import org.prolibertate.games.settings.SettingsRepository
 import org.prolibertate.games.ui.AppEnv
 import org.prolibertate.games.ui.AppRoot
@@ -24,6 +25,7 @@ class MainActivity : ComponentActivity() {
             settingsRepository = SettingsRepository(applicationContext),
             updater = Updater(this),
             lobby = LobbyController(applicationContext, lifecycleScope),
+            scorekeeper = ScorekeeperRepository(applicationContext),
             peerId = stablePeerId(),
         )
 

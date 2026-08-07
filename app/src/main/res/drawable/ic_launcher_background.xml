@@ -8,6 +8,12 @@
   centre of a wide black band, and the narrow black guard splits the red into
   pairs.
 
+  The stripes reference @color/tartan_field rather than a literal, because the
+  same threadcount is woven in two colourways: Wallace red on a production
+  build, Wallace Hunting green on a dev one, so the two installs are told apart
+  in the app drawer by the icon alone. The build generates that colour; see
+  resValue in app/build.gradle.kts.
+
   Warp is opaque, weft laid over it at half opacity, which is what gives the
   blended squares rather than a flat grid. Paths run well past the viewport
   because the group is rotated 45 degrees; the overspill keeps the corners
@@ -22,43 +28,43 @@
         android:rotation="45"
         android:pivotX="54.0"
         android:pivotY="54.0">
-        <path android:fillColor="#0C0C0C" android:pathData="M-90.00,-90.00h288.00v288.00h-288.00z" />
-        <path android:fillColor="#E01B24" android:pathData="M-88.94,-90.00h16.94v288.00h-16.94z" />
-        <path android:fillColor="#E01B24" android:pathData="M-69.88,-90.00h16.94v288.00h-16.94z" />
-        <path android:fillColor="#F2C518" android:pathData="M-36.00,-90.00h2.12v288.00h-2.12z" />
-        <path android:fillColor="#E01B24" android:pathData="M-16.94,-90.00h16.94v288.00h-16.94z" />
-        <path android:fillColor="#E01B24" android:pathData="M2.12,-90.00h16.94v288.00h-16.94z" />
-        <path android:fillColor="#F2C518" android:pathData="M36.00,-90.00h2.12v288.00h-2.12z" />
-        <path android:fillColor="#E01B24" android:pathData="M55.06,-90.00h16.94v288.00h-16.94z" />
-        <path android:fillColor="#E01B24" android:pathData="M74.12,-90.00h16.94v288.00h-16.94z" />
-        <path android:fillColor="#F2C518" android:pathData="M108.00,-90.00h2.12v288.00h-2.12z" />
-        <path android:fillColor="#E01B24" android:pathData="M127.06,-90.00h16.94v288.00h-16.94z" />
-        <path android:fillColor="#E01B24" android:pathData="M146.12,-90.00h16.94v288.00h-16.94z" />
-        <path android:fillColor="#F2C518" android:pathData="M180.00,-90.00h2.12v288.00h-2.12z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,-105.88h288.00v16.94h-288.00z" />
-        <path android:fillColor="#E01B24" android:fillAlpha="0.5" android:pathData="M-90.00,-88.94h288.00v16.94h-288.00z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,-72.00h288.00v2.12h-288.00z" />
-        <path android:fillColor="#E01B24" android:fillAlpha="0.5" android:pathData="M-90.00,-69.88h288.00v16.94h-288.00z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,-52.94h288.00v16.94h-288.00z" />
-        <path android:fillColor="#F2C518" android:fillAlpha="0.5" android:pathData="M-90.00,-36.00h288.00v2.12h-288.00z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,-33.88h288.00v16.94h-288.00z" />
-        <path android:fillColor="#E01B24" android:fillAlpha="0.5" android:pathData="M-90.00,-16.94h288.00v16.94h-288.00z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,0.00h288.00v2.12h-288.00z" />
-        <path android:fillColor="#E01B24" android:fillAlpha="0.5" android:pathData="M-90.00,2.12h288.00v16.94h-288.00z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,19.06h288.00v16.94h-288.00z" />
-        <path android:fillColor="#F2C518" android:fillAlpha="0.5" android:pathData="M-90.00,36.00h288.00v2.12h-288.00z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,38.12h288.00v16.94h-288.00z" />
-        <path android:fillColor="#E01B24" android:fillAlpha="0.5" android:pathData="M-90.00,55.06h288.00v16.94h-288.00z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,72.00h288.00v2.12h-288.00z" />
-        <path android:fillColor="#E01B24" android:fillAlpha="0.5" android:pathData="M-90.00,74.12h288.00v16.94h-288.00z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,91.06h288.00v16.94h-288.00z" />
-        <path android:fillColor="#F2C518" android:fillAlpha="0.5" android:pathData="M-90.00,108.00h288.00v2.12h-288.00z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,110.12h288.00v16.94h-288.00z" />
-        <path android:fillColor="#E01B24" android:fillAlpha="0.5" android:pathData="M-90.00,127.06h288.00v16.94h-288.00z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,144.00h288.00v2.12h-288.00z" />
-        <path android:fillColor="#E01B24" android:fillAlpha="0.5" android:pathData="M-90.00,146.12h288.00v16.94h-288.00z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,163.06h288.00v16.94h-288.00z" />
-        <path android:fillColor="#F2C518" android:fillAlpha="0.5" android:pathData="M-90.00,180.00h288.00v2.12h-288.00z" />
-        <path android:fillColor="#0C0C0C" android:fillAlpha="0.5" android:pathData="M-90.00,182.12h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:pathData="M-90.00,-90.00h288.00v288.00h-288.00z" />
+        <path android:fillColor="@color/tartan_field" android:pathData="M-88.94,-90.00h16.94v288.00h-16.94z" />
+        <path android:fillColor="@color/tartan_field" android:pathData="M-69.88,-90.00h16.94v288.00h-16.94z" />
+        <path android:fillColor="@color/tartan_over" android:pathData="M-36.00,-90.00h2.12v288.00h-2.12z" />
+        <path android:fillColor="@color/tartan_field" android:pathData="M-16.94,-90.00h16.94v288.00h-16.94z" />
+        <path android:fillColor="@color/tartan_field" android:pathData="M2.12,-90.00h16.94v288.00h-16.94z" />
+        <path android:fillColor="@color/tartan_over" android:pathData="M36.00,-90.00h2.12v288.00h-2.12z" />
+        <path android:fillColor="@color/tartan_field" android:pathData="M55.06,-90.00h16.94v288.00h-16.94z" />
+        <path android:fillColor="@color/tartan_field" android:pathData="M74.12,-90.00h16.94v288.00h-16.94z" />
+        <path android:fillColor="@color/tartan_over" android:pathData="M108.00,-90.00h2.12v288.00h-2.12z" />
+        <path android:fillColor="@color/tartan_field" android:pathData="M127.06,-90.00h16.94v288.00h-16.94z" />
+        <path android:fillColor="@color/tartan_field" android:pathData="M146.12,-90.00h16.94v288.00h-16.94z" />
+        <path android:fillColor="@color/tartan_over" android:pathData="M180.00,-90.00h2.12v288.00h-2.12z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,-105.88h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_field" android:fillAlpha="0.5" android:pathData="M-90.00,-88.94h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,-72.00h288.00v2.12h-288.00z" />
+        <path android:fillColor="@color/tartan_field" android:fillAlpha="0.5" android:pathData="M-90.00,-69.88h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,-52.94h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_over" android:fillAlpha="0.5" android:pathData="M-90.00,-36.00h288.00v2.12h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,-33.88h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_field" android:fillAlpha="0.5" android:pathData="M-90.00,-16.94h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,0.00h288.00v2.12h-288.00z" />
+        <path android:fillColor="@color/tartan_field" android:fillAlpha="0.5" android:pathData="M-90.00,2.12h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,19.06h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_over" android:fillAlpha="0.5" android:pathData="M-90.00,36.00h288.00v2.12h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,38.12h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_field" android:fillAlpha="0.5" android:pathData="M-90.00,55.06h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,72.00h288.00v2.12h-288.00z" />
+        <path android:fillColor="@color/tartan_field" android:fillAlpha="0.5" android:pathData="M-90.00,74.12h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,91.06h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_over" android:fillAlpha="0.5" android:pathData="M-90.00,108.00h288.00v2.12h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,110.12h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_field" android:fillAlpha="0.5" android:pathData="M-90.00,127.06h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,144.00h288.00v2.12h-288.00z" />
+        <path android:fillColor="@color/tartan_field" android:fillAlpha="0.5" android:pathData="M-90.00,146.12h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,163.06h288.00v16.94h-288.00z" />
+        <path android:fillColor="@color/tartan_over" android:fillAlpha="0.5" android:pathData="M-90.00,180.00h288.00v2.12h-288.00z" />
+        <path android:fillColor="@color/tartan_ground" android:fillAlpha="0.5" android:pathData="M-90.00,182.12h288.00v16.94h-288.00z" />
     </group>
 </vector>

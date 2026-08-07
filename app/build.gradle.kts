@@ -16,22 +16,63 @@ val buildChannel = System.getenv("PLG_CHANNEL").orEmpty()
 val runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "").toIntOrNull() ?: 0
 val stampVersion = buildChannel.isNotEmpty() && runNumber > 0
 
+// Anything that is not an explicit production build is a dev build: ci.yml
+// stamps "dev", and a local build with nothing set counts as dev too.
+//
+// This one flag drives everything that makes a dev build a separate app rather
+// than a replacement for the production one — its own applicationId, its own
+// launcher name, and the hunting sett in place of the clan sett. They have to
+// move together: a dev package wearing the production name and colours is
+// exactly the confusion having both installed is meant to avoid.
+val isDevBuild = buildChannel != "production"
+
 android {
     namespace = "org.prolibertate.games"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "org.prolibertate.games"
+        // A dev build installs under its own package, so a dev copy and a
+        // production copy can sit side by side on one device instead of one
+        // replacing the other. The namespace above is deliberately left alone:
+        // R and BuildConfig stay in org.prolibertate.games for both, so no
+        // source has to care which package it ended up installed as.
+        applicationId = if (isDevBuild) "org.prolibertate.games.dev" else "org.prolibertate.games"
         minSdk = 24
         targetSdk = 34
         // The -dev suffix in versionName is what the installed app reads to
-        // know its own channel, so it must survive into the shipped APK.
+        // know its own channel, so it must survive into the shipped APK. It
+        // tracks isDevBuild rather than the stamp alone, so an unstamped local
+        // build cannot end up claiming a channel its applicationId contradicts.
         versionCode = if (stampVersion) runNumber else 1
         versionName = when {
             stampVersion && buildChannel == "production" -> "1.0.$runNumber"
             stampVersion -> "1.0.$runNumber-dev"
-            else -> "1.0.0-dev"
+            isDevBuild -> "1.0.0-dev"
+            else -> "1.0.0"
         }
+
+        // The launcher label. With both copies on the phone the app drawer shows
+        // two entries, and this is what names them apart.
+        resValue(
+            "string",
+            "app_name",
+            if (isDevBuild) "Pro Libertate Games DEV" else "Pro Libertate Games",
+        )
+
+        // The one colour that separates the two setts: Wallace red for
+        // production, Wallace Hunting green for dev. The icon vectors reference
+        // this rather than a literal, and Tartan.kt picks the matching Compose
+        // colour off DEV_BUILD below — the two have to stay in step or the
+        // launcher icon and the splash it opens on would be different cloth.
+        resValue("color", "tartan_field", if (isDevBuild) "#1E7A3C" else "#E01B24")
+        // Shades of the same field, so a launch does not flash the wrong colour
+        // before the tartan is drawn: splash_background is held behind the
+        // window for that instant, ic_launcher_background is the icon's flat
+        // fallback.
+        resValue("color", "splash_background", if (isDevBuild) "#0D2E17" else "#4A0B10")
+        resValue("color", "ic_launcher_background", if (isDevBuild) "#145C2D" else "#B3121B")
+
+        buildConfigField("boolean", "DEV_BUILD", isDevBuild.toString())
     }
 
     signingConfigs {
@@ -59,6 +100,8 @@ android {
 
     buildFeatures {
         compose = true
+        // For DEV_BUILD, which is how the Compose tartan picks its sett.
+        buildConfig = true
     }
 
     composeOptions {

@@ -41,6 +41,32 @@ Each client is then sent a state **redacted for its own seat**, so opponents'
 hands and the deck order are never transmitted to devices that should not see
 them.
 
+## Scorekeeper
+
+**Scorekeeper** on the main menu is a pencil for games the app does not deal —
+darts, cribbage, whatever is actually on the table. Say how many are playing,
+name them, and write down what each of them scored every round; the running
+tally sits at the foot of the screen, where the one number anybody looks up is
+always visible.
+
+Players can be renamed, added, removed or **dragged into a different order** at
+any point in a game. That works because points are recorded against a player's
+id rather than their position, so reordering the sheet moves the columns and
+nothing else. Ids are handed out once and never reused: somebody sitting down
+where somebody else got up starts at nought instead of inheriting a stranger's
+score. Removing a player does take their points with them — a score nobody can
+see is a score nobody can correct.
+
+Rounds are not written in ink. Tapping one reopens it for correction or lets it
+be struck out, and the totals follow.
+
+The sheet is saved as it is edited, so leaving the app or taking a phone call
+does not lose the game. It is kept in its own DataStore rather than with the
+settings, because it is a game in progress rather than a preference.
+
+`score/ScoreSheet.kt` holds the whole model and, like `game/`, has no Android in
+it: every rule above is a pure function and unit-tested on the JVM.
+
 ## Settings
 
 - **Sound** on/off.
@@ -51,11 +77,19 @@ them.
   - **Production** — stable builds, published from `main`.
   - **Dev** — preview builds, published from `dev` on every green CI run.
 
+  The two install as separate apps, so both can be kept on one device — see
+  [Both channels on one device](#both-channels-on-one-device).
+
 ## Branding
 
 The launcher icon is a single square of the Wallace tartan set on the bias, and
 the app opens on the same cloth carrying the name in a Celtic uncial hand for two
 seconds before fading into the menu.
+
+A dev build wears **Wallace Hunting** instead — the same threadcount with green
+where the clan sett has red — and installs as *Pro Libertate Games DEV*. That is
+what tells the two copies apart when both are on the phone; see
+[Both channels on one device](#both-channels-on-one-device).
 
 The tartan is drawn, not an image: `ui/theme/Tartan.kt` lays the sett down as
 warp and then as weft at half opacity, which is what produces the blended
@@ -72,7 +106,9 @@ Two honest caveats:
   and the narrow black guard sits *between two red blocks*. The icon is
   generated from the same numbers, so the icon and the splash cannot drift.
   Weave scale is derived from the sett rather than fixed, so changing the
-  threadcount rescales both instead of silently zooming in.
+  threadcount rescales both instead of silently zooming in. The hunting
+  colourway is the same threadcount passed a different field colour, not a
+  second copy of the numbers, so it cannot fall out of step either.
 - **The typeface is bundled under a licence.** Uncial Antiqua, © 2011 Brian J.
   Bonislawsky DBA Astigmatic, Reserved Font Name "Uncial Antiqua", used under
   the SIL Open Font License 1.1. The full licence is at
@@ -100,6 +136,11 @@ smaller than a fingertip.
 ```
 
 Requires JDK 17 and the Android SDK (compileSdk 34).
+
+A local build is a dev build: it installs as `org.prolibertate.games.dev` under
+the name *Pro Libertate Games DEV* in the hunting sett, so it goes on beside an
+installed release rather than over it. Set `PLG_CHANNEL=production` to build the
+production package instead.
 
 ## CI
 
@@ -161,9 +202,39 @@ is the run number of the workflow that produced it, and the two workflows count
 separately. Versions are therefore only ever compared *within* a channel; the app
 reads the `-dev` suffix in its own `versionName` to know which channel it is on,
 and treats a change of channel as an explicit switch rather than an upgrade.
-One consequence: switching channels can be a downgrade as far as Android is
-concerned, in which case the install is refused until the current copy is
-uninstalled. The settings screen says so when it applies.
+
+### Both channels on one device
+
+A dev build installs under its own `applicationId`, `org.prolibertate.games.dev`,
+so it is a separate app as far as Android is concerned and can sit beside the
+production copy rather than replacing it. Each channel still updates itself
+normally, because an update within a channel keeps the same package.
+
+Three things move together, all off `isDevBuild` in `app/build.gradle.kts`:
+
+| | Production | Dev |
+| --- | --- | --- |
+| `applicationId` | `org.prolibertate.games` | `org.prolibertate.games.dev` |
+| Launcher name | Pro Libertate Games | Pro Libertate Games DEV |
+| Sett | Wallace (red) | Wallace Hunting (green) |
+
+Anything that is not an explicit `PLG_CHANNEL=production` build is a dev build,
+so a local `assembleDebug` is a dev build too and installs alongside a release
+without uninstalling anything.
+
+They have to move together. A dev package wearing the production name and
+colours is precisely the mix-up that having both installed is meant to prevent,
+which is why one flag drives all three rather than each being set by hand. The
+name and the colours reach the resources through `resValue`, so `app_name`,
+`tartan_field`, `splash_background` and `ic_launcher_background` are generated
+by the build and are deliberately *not* in `res/values/` — the icon vectors
+reference `@color/tartan_field` rather than a literal, which is how one set of
+vectors serves both colourways. `BuildConfig.DEV_BUILD` carries the same flag
+into Kotlin, where `AppSett` picks the matching Compose sett for the splash.
+
+Switching channels in Settings therefore installs the other channel's app
+alongside this one and leaves this one in place; the settings screen says so
+when the selected channel is not the installed one.
 
 The debug keystore is committed on purpose: every build is signed with the same
 key, so an OTA update installs over the previous one instead of being rejected
@@ -202,6 +273,7 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
   chess/       Chess model, FEN, move generation, search
   tayu/        Ta Yü tile geometry, river rules, scoring, AI
 net/           wire protocol, LAN transport, lobby, match driver
+score/         scorekeeper sheet — pure Kotlin, unit-tested — and its store
 settings/      DataStore-backed preferences
 update/        GitHub Releases OTA updater
 ui/            Compose screens
