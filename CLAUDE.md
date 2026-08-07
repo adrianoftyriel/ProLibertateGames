@@ -46,7 +46,7 @@ Skipping step 4 leaves a branch whose head was never built and no release.
 Both long-lived branches publish, so a merge is a release, not just an
 integration:
 
-- **`dev`** → `ci.yml` publishes a `v1.0.N-dev` **prerelease**, offered by the
+- **`dev`** → `ci.yml` publishes a `v<series>.N-dev` **prerelease**, offered by the
   in-app updater to anyone on the Dev channel.
 - **`main`** → `release.yml` publishes a **production** release, which the
   updater installs for everyone on the Production channel.

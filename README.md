@@ -165,9 +165,10 @@ production package instead.
 
 - `.github/workflows/ci.yml` — builds, tests and lints on `dev` and on pull
   requests into `dev` or `main`. Its APK artifact is a dev build, versioned
-  `1.0.0-dev`.
+  `<series>.0-dev` — the series being whatever `plgVersionSeries` says in
+  `gradle.properties`, currently **1.1**.
 - `.github/workflows/release.yml` — on push to `main`, builds the APK and
-  publishes it as a GitHub Release tagged `v1.0.<run-number>`. The in-app updater
+  publishes it as a GitHub Release tagged `v<series>.<run-number>`. The in-app updater
   reads that tag, which is why the APK's `versionCode` is the same run number.
 
 ### Installing without the app
@@ -186,14 +187,34 @@ prereleases by design, and that is exactly what keeps a production install from
 being handed a dev build. Dev builds are reached through the in-app updater with
 the channel set to dev, or from the releases page.
 
+### The version series
+
+A version is **`<series>.<run number>`**. The series is set by hand, once, in
+`gradle.properties`:
+
+```properties
+plgVersionSeries=1.1
+```
+
+Both workflows read that same property when they name a release tag, and the
+build reads it when it stamps the APK, so the tag and what is inside it cannot
+name different versions. Bumping a series is a one-line change to that file and
+nothing else.
+
+The number after it is the CI run number and keeps climbing on its own, which is
+what makes a series bump safe: `versionCode` is the run number *alone*, so
+going from 1.0 to 1.1 never looks like a downgrade to Android and never
+interrupts an OTA update. The series is a name for people; the run number is
+what the machines compare.
+
 ### Update channels
 
 Both pipelines publish, to two separate channels:
 
 | Channel | Published by | Tag | Marked |
 | --- | --- | --- | --- |
-| Production | `release.yml`, push to `main` | `v1.0.<n>` | release |
-| Dev | `ci.yml`, any build of `dev` | `v1.0.<n>-dev` | prerelease |
+| Production | `release.yml`, push to `main` | `v<series>.<n>` | release |
+| Dev | `ci.yml`, any build of `dev` | `v<series>.<n>-dev` | prerelease |
 
 Dev builds are published as **prereleases** deliberately: GitHub's "latest
 release" endpoint skips prereleases, so a production-channel install can never
