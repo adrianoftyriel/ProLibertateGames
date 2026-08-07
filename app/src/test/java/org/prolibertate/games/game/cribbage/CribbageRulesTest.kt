@@ -447,6 +447,39 @@ class CribbageRulesTest {
         assertTrue("ai won $aiWins of ten against random play", aiWins > randomWins)
     }
 
+    @Test
+    fun `a partnership plays for its own crib and not just its own hand`() {
+        // Four-handed, with the two AI seats facing each other. The lay-away is
+        // where a partner's crib has to count as your own, so a side that
+        // treated it as an opponent's would be giving away half its own cribs.
+        val ai = CribbageAi()
+        var aiWins = 0
+
+        repeat(8) { iteration ->
+            val random = Random(900L + iteration)
+            val options = CribbageOptions(playerCount = 4, pointsToWin = 61)
+            var state = CribbageRules.initialState(config(options, seed = 500L + iteration))
+            var guard = 0
+            while (!CribbageRules.isFinished(state) && guard++ < 40000) {
+                val seat = CribbageRules.currentSeat(state)
+                if (seat == null) {
+                    state = CribbageRules.nextHand(state)
+                    continue
+                }
+                val legal = CribbageRules.legalMoves(state, seat)
+                val move = if (options.teamOf(seat) == 0) {
+                    ai.chooseMove(state, seat, legal)
+                } else {
+                    legal[random.nextInt(legal.size)]
+                }
+                state = CribbageRules.applyMove(state, seat, move)
+            }
+            if (state.winner == 0) aiWins++
+        }
+
+        assertTrue("the ai partnership won $aiWins of eight", aiWins > 4)
+    }
+
     // -- Redaction and wire format ------------------------------------------
 
     @Test
