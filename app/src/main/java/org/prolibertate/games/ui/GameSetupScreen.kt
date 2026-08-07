@@ -36,6 +36,8 @@ import org.prolibertate.games.game.crazyeights.CrazyEightsOptions
 import org.prolibertate.games.game.euchre.EuchreOptions
 import org.prolibertate.games.game.golf.GolfOptions
 import org.prolibertate.games.game.kaiser.KaiserOptions
+import org.prolibertate.games.game.morris.MorrisLevel
+import org.prolibertate.games.game.morris.MorrisOptions
 import org.prolibertate.games.game.president.PresidentOptions
 import org.prolibertate.games.game.sequence.SequenceOptions
 import org.prolibertate.games.game.tayu.TayuLevel
@@ -71,6 +73,7 @@ fun GameSetupScreen(
     var wizard by remember { mutableStateOf(WizardOptions()) }
     var chess by remember { mutableStateOf(ChessOptions()) }
     var tayu by remember { mutableStateOf(TayuOptions()) }
+    var morris by remember { mutableStateOf(MorrisOptions()) }
     // Not an engine option: which seat the local player takes. Seat 0 is
     // always White, so choosing Black means sitting in seat 1.
     var playWhite by remember { mutableStateOf(true) }
@@ -85,6 +88,7 @@ fun GameSetupScreen(
         GameCatalog.WIZARD -> setupJson.encodeToString(wizard)
         GameCatalog.CHESS -> setupJson.encodeToString(chess)
         GameCatalog.TAYU -> setupJson.encodeToString(tayu)
+        GameCatalog.MORRIS -> setupJson.encodeToString(morris)
         else -> "{}"
     }
     val seatCount = seatCountFor(descriptor.id, optionsJson)
@@ -118,6 +122,8 @@ fun GameSetupScreen(
                 )
 
                 GameCatalog.TAYU -> TayuOptionsEditor(tayu) { tayu = it }
+
+                GameCatalog.MORRIS -> MorrisOptionsEditor(morris) { morris = it }
 
                 else -> Text("No options yet for this game.")
             }
@@ -196,7 +202,7 @@ fun seatCountFor(gameId: String, optionsJson: String): Int {
             GameCatalog.WIZARD ->
                 setupJson.decodeFromString<WizardOptions>(optionsJson).playerCount
 
-            GameCatalog.CHESS -> 2
+            GameCatalog.CHESS, GameCatalog.MORRIS -> 2
 
             GameCatalog.TAYU ->
                 setupJson.decodeFromString<TayuOptions>(optionsJson).playerCount
@@ -526,6 +532,54 @@ private fun ChessOptionsEditor(
         Text(
             text = "Full rules: castling, en passant, promotion, stalemate, and a draw " +
                 "when neither side has enough material to mate.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun MorrisOptionsEditor(options: MorrisOptions, onChange: (MorrisOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Opponent",
+            values = MorrisLevel.entries.toList(),
+            selected = options.level,
+            display = { it.label },
+            onSelect = { onChange(options.copy(level = it)) },
+        )
+        ChipRow(
+            label = "Pieces each",
+            values = listOf(3, 6, 9),
+            selected = options.piecesEach,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(piecesEach = it)) },
+        )
+        ToggleRow(
+            title = "Flying on three",
+            subtitle = "A player down to three pieces may jump anywhere rather than " +
+                "step along a line",
+            checked = options.flyingWithThree,
+            onChange = { onChange(options.copy(flyingWithThree = it)) },
+        )
+        ToggleRow(
+            title = "Threefold repetition",
+            subtitle = "The same position three times over is a draw",
+            checked = options.threefoldRepetition,
+            onChange = { onChange(options.copy(threefoldRepetition = it)) },
+        )
+        ChipRow(
+            label = "Draw with no mill for",
+            values = listOf(0, 50, 100, 200),
+            selected = options.plyLimitWithoutMill,
+            display = { if (it == 0) "never" else "$it moves" },
+            onSelect = { onChange(options.copy(plyLimitWithoutMill = it)) },
+        )
+        Text(
+            text = "Nine each is the game proper; fewer is a shorter game on the same " +
+                "board rather than the smaller boards Three and Six Men's Morris are " +
+                "really played on. Flying is the usual rule — without it a player " +
+                "down to three is squeezed out, and with it they can be very hard " +
+                "to finish off.",
             style = MaterialTheme.typography.bodySmall,
         )
     }

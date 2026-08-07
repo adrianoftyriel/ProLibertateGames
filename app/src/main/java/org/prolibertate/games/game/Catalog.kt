@@ -39,6 +39,7 @@ object GameCatalog {
     const val CHESS = "chess"
     const val CHECKERS = "checkers"
     const val TAYU = "tayu"
+    const val MORRIS = "morris"
 
     val all: List<GameDescriptor> = listOf(
         GameDescriptor(
@@ -150,6 +151,16 @@ object GameCatalog {
             teamBased = false,
             blurb = "Forced captures, kings, and the long diagonal.",
             available = false,
+        ),
+        GameDescriptor(
+            id = MORRIS,
+            title = "Nine Men's Morris",
+            category = GameCategory.BOARD,
+            minPlayers = 2,
+            maxPlayers = 2,
+            teamBased = false,
+            blurb = "Three in a row takes a piece. Reduce them to two and the game is yours.",
+            available = true,
         ),
         GameDescriptor(
             id = TAYU,

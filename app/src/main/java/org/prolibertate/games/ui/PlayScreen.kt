@@ -31,6 +31,10 @@ import org.prolibertate.games.game.kaiser.KaiserMove
 import org.prolibertate.games.game.kaiser.KaiserPhase
 import org.prolibertate.games.game.kaiser.KaiserRules
 import org.prolibertate.games.game.kaiser.KaiserState
+import org.prolibertate.games.game.morris.MorrisAi
+import org.prolibertate.games.game.morris.MorrisMove
+import org.prolibertate.games.game.morris.MorrisRules
+import org.prolibertate.games.game.morris.MorrisState
 import org.prolibertate.games.game.president.PresidentAi
 import org.prolibertate.games.game.president.PresidentMove
 import org.prolibertate.games.game.president.PresidentPhase
@@ -56,6 +60,7 @@ import org.prolibertate.games.ui.game.CrazyEightsScreen
 import org.prolibertate.games.ui.game.EuchreScreen
 import org.prolibertate.games.ui.game.GolfScreen
 import org.prolibertate.games.ui.game.KaiserScreen
+import org.prolibertate.games.ui.game.MorrisScreen
 import org.prolibertate.games.ui.game.PresidentScreen
 import org.prolibertate.games.ui.game.TRICK_HOLD_MILLIS
 import org.prolibertate.games.ui.game.SequenceScreen
@@ -300,6 +305,27 @@ fun PlayScreen(
             }
             StartMatch(env, controller, route)
             TayuScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.MORRIS -> {
+            val controller = remember(route) {
+                MatchController<MorrisState, MorrisMove>(
+                    rules = MorrisRules,
+                    // As with chess, the strength is part of the table's own
+                    // options, so this does not have to decode anything.
+                    ai = MorrisAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    // The search is the thinking time; anything added on top of
+                    // it would only make the computer look slower than it is.
+                    aiThinkingMillis = { settings.scaled(250L) },
+                )
+            }
+            StartMatch(env, controller, route)
+            MorrisScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
         }
 
         GameCatalog.CHESS -> {
