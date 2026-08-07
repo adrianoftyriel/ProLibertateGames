@@ -22,11 +22,18 @@
 
         <!-- No fixed orientation: the UI adapts to portrait, landscape and
              tablet widths. configChanges keeps Compose state across rotation
-             instead of tearing the activity down mid-hand. -->
+             instead of tearing the activity down mid-hand.
+
+             adjustResize is stated rather than left to the system to resolve:
+             the scorekeeper types into the bottom row of its sheet, and the
+             totals and the button that finishes the round sit below that. The
+             window has to shrink so they stay above the keyboard rather than
+             being panned off the screen. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
