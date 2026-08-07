@@ -5,12 +5,12 @@ or against other people over Wi-Fi (LAN).
 
 ## What works today
 
-The app shell is complete and nine games are playable end to end:
+The app shell is complete and ten games are playable end to end:
 
 | | |
 | --- | --- |
-| **Playable** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s, Sequence, Chess, Ta Yü |
-| **Listed, not yet implemented** | Mastermind, Backgammon, Checkers, Nine Men's Morris, Pirates and Bulgars |
+| **Playable** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s, Sequence, Chess, Ta Yü, Nine Men's Morris |
+| **Listed, not yet implemented** | Mastermind, Backgammon, Checkers, Pirates and Bulgars |
 
 Unimplemented games appear in the menu marked *Coming soon* **on dev builds
 only** — a production release lists just the games that can actually be played,
@@ -269,6 +269,7 @@ game:
 - [Wizard](docs/RULES-wizard.md)
 - [Crazy 8s](docs/RULES-crazy8s.md)
 - [Chess](docs/RULES-chess.md)
+- [Nine Men's Morris](docs/RULES-morris.md)
 - [Ta Yü](docs/RULES-tayu.md) — **note the caveats about the reconstruction**:
   the game is out of print and the rulebook could not be obtained, so the
   document says which parts are attested and which were derived
@@ -287,6 +288,7 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
   wizard/      Wizard model, rules, AI
   crazyeights/ Crazy 8s model, rules, AI
   chess/       Chess model, FEN, move generation, search
+  morris/      Nine Men's Morris board geometry, mills, rules, search
   tayu/        Ta Yü tile geometry, river rules, scoring, AI
 net/           wire protocol, LAN transport, lobby, match driver
 score/         scorekeeper sheet — pure Kotlin, unit-tested — and its store

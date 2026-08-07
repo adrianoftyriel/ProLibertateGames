@@ -60,6 +60,7 @@ class CatalogTest {
                 GameCatalog.WIZARD,
                 GameCatalog.CHESS,
                 GameCatalog.TAYU,
+                GameCatalog.MORRIS,
             ),
             GameCatalog.playable.map { it.id }.toSet(),
         )
