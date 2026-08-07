@@ -5,20 +5,23 @@ or against other people over Wi-Fi (LAN).
 
 ## What works today
 
-The app shell is complete and ten games are playable end to end:
+The app shell is complete and every game in the catalogue is playable end to end:
 
 | | |
 | --- | --- |
-| **Playable** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s, Sequence, Chess, Ta Yü, Nine Men's Morris |
-| **Listed, not yet implemented** | Mastermind, Backgammon, Checkers, Pirates and Bulgars |
+| **Cards** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s |
+| **Board** | Sequence, Chess, Checkers, Backgammon, Mastermind, Nine Men's Morris, Pirates and Bulgars, Ta Yü |
 
-Unimplemented games appear in the menu marked *Coming soon* **on dev builds
-only** — a production release lists just the games that can actually be played,
-so nobody installs it and taps into a dead end. The menu decides this from the
-installed APK's own version name, so it follows the build rather than the
-channel selected for future updates. Adding one means
-writing a `GameRules` implementation, a `GameAi`, and a screen, then flipping
-`available` in `GameCatalog` — the menu, lobby, networking, settings and OTA
+Nothing is marked *Coming soon* at the moment, because nothing is waiting. The
+machinery for it is still there and still tested: a game listed in `GameCatalog`
+with `available = false` appears in the menu marked *Coming soon* **on dev builds
+only**, so a production release lists just what can actually be played and nobody
+installs it and taps into a dead end. The menu decides this from the installed
+APK's own version name, so it follows the build rather than the channel selected
+for future updates.
+
+Adding a game means writing a `GameRules` implementation, a `GameAi` and a
+screen, then flipping `available` — the menu, lobby, networking, settings and OTA
 layers are game-agnostic and need no changes.
 
 ## Playing with other people
@@ -162,9 +165,10 @@ production package instead.
 
 - `.github/workflows/ci.yml` — builds, tests and lints on `dev` and on pull
   requests into `dev` or `main`. Its APK artifact is a dev build, versioned
-  `1.0.0-dev`.
+  `<series>.0-dev` — the series being whatever `plgVersionSeries` says in
+  `gradle.properties`, currently **1.1**.
 - `.github/workflows/release.yml` — on push to `main`, builds the APK and
-  publishes it as a GitHub Release tagged `v1.0.<run-number>`. The in-app updater
+  publishes it as a GitHub Release tagged `v<series>.<run-number>`. The in-app updater
   reads that tag, which is why the APK's `versionCode` is the same run number.
 
 ### Installing without the app
@@ -183,14 +187,34 @@ prereleases by design, and that is exactly what keeps a production install from
 being handed a dev build. Dev builds are reached through the in-app updater with
 the channel set to dev, or from the releases page.
 
+### The version series
+
+A version is **`<series>.<run number>`**. The series is set by hand, once, in
+`gradle.properties`:
+
+```properties
+plgVersionSeries=1.1
+```
+
+Both workflows read that same property when they name a release tag, and the
+build reads it when it stamps the APK, so the tag and what is inside it cannot
+name different versions. Bumping a series is a one-line change to that file and
+nothing else.
+
+The number after it is the CI run number and keeps climbing on its own, which is
+what makes a series bump safe: `versionCode` is the run number *alone*, so
+going from 1.0 to 1.1 never looks like a downgrade to Android and never
+interrupts an OTA update. The series is a name for people; the run number is
+what the machines compare.
+
 ### Update channels
 
 Both pipelines publish, to two separate channels:
 
 | Channel | Published by | Tag | Marked |
 | --- | --- | --- | --- |
-| Production | `release.yml`, push to `main` | `v1.0.<n>` | release |
-| Dev | `ci.yml`, any build of `dev` | `v1.0.<n>-dev` | prerelease |
+| Production | `release.yml`, push to `main` | `v<series>.<n>` | release |
+| Dev | `ci.yml`, any build of `dev` | `v<series>.<n>-dev` | prerelease |
 
 Dev builds are published as **prereleases** deliberately: GitHub's "latest
 release" endpoint skips prereleases, so a production-channel install can never
@@ -269,7 +293,14 @@ game:
 - [Wizard](docs/RULES-wizard.md)
 - [Crazy 8s](docs/RULES-crazy8s.md)
 - [Chess](docs/RULES-chess.md)
+- [Checkers](docs/RULES-checkers.md) — **note the caveat about flying kings**
+- [Backgammon](docs/RULES-backgammon.md) — **note that there is no doubling cube**
+- [Mastermind](docs/RULES-mastermind.md) — played as a duel: each player sets
+  the code the other has to break
 - [Nine Men's Morris](docs/RULES-morris.md)
+- [Pirates and Bulgars](docs/RULES-pirates.md) — **note the caveats about the
+  reconstruction**: the book the theme comes from could not be obtained, so the
+  document says which rules are attested and which were chosen
 - [Ta Yü](docs/RULES-tayu.md) — **note the caveats about the reconstruction**:
   the game is out of print and the rulebook could not be obtained, so the
   document says which parts are attested and which were derived
@@ -289,6 +320,10 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
   crazyeights/ Crazy 8s model, rules, AI
   chess/       Chess model, FEN, move generation, search
   morris/      Nine Men's Morris board geometry, mills, rules, search
+  checkers/    Checkers board, compulsory captures, crowning, search
+  backgammon/  Backgammon points, dice, the maximal-roll rule, turn search
+  mastermind/  Mastermind codes, scoring, and a code breaker
+  pirates/     Pirates and Bulgars — the cross board, the hunt, search
   tayu/        Ta Yü tile geometry, river rules, scoring, AI
 net/           wire protocol, LAN transport, lobby, match driver
 score/         scorekeeper sheet — pure Kotlin, unit-tested — and its store

@@ -30,14 +30,22 @@ import org.prolibertate.games.game.GameDescriptor
 import org.prolibertate.games.game.engine.PlayerKind
 import org.prolibertate.games.game.engine.PlayerSlot
 import org.prolibertate.games.game.engine.TableConfig
+import org.prolibertate.games.game.backgammon.BackgammonLevel
+import org.prolibertate.games.game.backgammon.BackgammonOptions
+import org.prolibertate.games.game.checkers.CheckersLevel
+import org.prolibertate.games.game.checkers.CheckersOptions
 import org.prolibertate.games.game.chess.ChessLevel
 import org.prolibertate.games.game.chess.ChessOptions
 import org.prolibertate.games.game.crazyeights.CrazyEightsOptions
 import org.prolibertate.games.game.euchre.EuchreOptions
 import org.prolibertate.games.game.golf.GolfOptions
 import org.prolibertate.games.game.kaiser.KaiserOptions
+import org.prolibertate.games.game.mastermind.MastermindLevel
+import org.prolibertate.games.game.mastermind.MastermindOptions
 import org.prolibertate.games.game.morris.MorrisLevel
 import org.prolibertate.games.game.morris.MorrisOptions
+import org.prolibertate.games.game.pirates.PiratesLevel
+import org.prolibertate.games.game.pirates.PiratesOptions
 import org.prolibertate.games.game.president.PresidentOptions
 import org.prolibertate.games.game.sequence.SequenceOptions
 import org.prolibertate.games.game.tayu.TayuLevel
@@ -74,9 +82,16 @@ fun GameSetupScreen(
     var chess by remember { mutableStateOf(ChessOptions()) }
     var tayu by remember { mutableStateOf(TayuOptions()) }
     var morris by remember { mutableStateOf(MorrisOptions()) }
+    var checkers by remember { mutableStateOf(CheckersOptions()) }
+    var backgammon by remember { mutableStateOf(BackgammonOptions()) }
+    var mastermind by remember { mutableStateOf(MastermindOptions()) }
+    var pirates by remember { mutableStateOf(PiratesOptions()) }
     // Not an engine option: which seat the local player takes. Seat 0 is
     // always White, so choosing Black means sitting in seat 1.
     var playWhite by remember { mutableStateOf(true) }
+    // Pirates and Bulgars is not symmetrical, so which side you take is the
+    // first thing about the game rather than a detail of it.
+    var playPirates by remember { mutableStateOf(false) }
 
     val optionsJson = when (descriptor.id) {
         GameCatalog.EUCHRE -> setupJson.encodeToString(euchre)
@@ -89,6 +104,10 @@ fun GameSetupScreen(
         GameCatalog.CHESS -> setupJson.encodeToString(chess)
         GameCatalog.TAYU -> setupJson.encodeToString(tayu)
         GameCatalog.MORRIS -> setupJson.encodeToString(morris)
+        GameCatalog.CHECKERS -> setupJson.encodeToString(checkers)
+        GameCatalog.BACKGAMMON -> setupJson.encodeToString(backgammon)
+        GameCatalog.MASTERMIND -> setupJson.encodeToString(mastermind)
+        GameCatalog.PIRATES -> setupJson.encodeToString(pirates)
         else -> "{}"
     }
     val seatCount = seatCountFor(descriptor.id, optionsJson)
@@ -125,6 +144,19 @@ fun GameSetupScreen(
 
                 GameCatalog.MORRIS -> MorrisOptionsEditor(morris) { morris = it }
 
+                GameCatalog.CHECKERS -> CheckersOptionsEditor(checkers) { checkers = it }
+
+                GameCatalog.BACKGAMMON -> BackgammonOptionsEditor(backgammon) { backgammon = it }
+
+                GameCatalog.MASTERMIND -> MastermindOptionsEditor(mastermind) { mastermind = it }
+
+                GameCatalog.PIRATES -> PiratesOptionsEditor(
+                    options = pirates,
+                    playPirates = playPirates,
+                    onChange = { pirates = it },
+                    onSide = { playPirates = it },
+                )
+
                 else -> Text("No options yet for this game.")
             }
 
@@ -137,9 +169,14 @@ fun GameSetupScreen(
                 style = MaterialTheme.typography.bodySmall,
             )
 
-            // Chess is the only game so far where the local player picks a
-            // seat rather than always taking the first one.
-            val localSeat = if (descriptor.id == GameCatalog.CHESS && !playWhite) 1 else 0
+            // Two games let the local player pick a seat rather than always
+            // taking the first one: chess by colour, and Pirates and Bulgars by
+            // which side of a very lopsided fight they fancy.
+            val localSeat = when {
+                descriptor.id == GameCatalog.CHESS && !playWhite -> 1
+                descriptor.id == GameCatalog.PIRATES && playPirates -> 1
+                else -> 0
+            }
             PrimaryAction(text = "Play against the computer") {
                 onPlayOffline(
                     offlineConfig(descriptor.id, optionsJson, seatCount, playerName, localSeat),
@@ -202,7 +239,8 @@ fun seatCountFor(gameId: String, optionsJson: String): Int {
             GameCatalog.WIZARD ->
                 setupJson.decodeFromString<WizardOptions>(optionsJson).playerCount
 
-            GameCatalog.CHESS, GameCatalog.MORRIS -> 2
+            GameCatalog.CHESS, GameCatalog.MORRIS, GameCatalog.CHECKERS,
+            GameCatalog.BACKGAMMON, GameCatalog.MASTERMIND, GameCatalog.PIRATES -> 2
 
             GameCatalog.TAYU ->
                 setupJson.decodeFromString<TayuOptions>(optionsJson).playerCount
@@ -532,6 +570,178 @@ private fun ChessOptionsEditor(
         Text(
             text = "Full rules: castling, en passant, promotion, stalemate, and a draw " +
                 "when neither side has enough material to mate.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun CheckersOptionsEditor(options: CheckersOptions, onChange: (CheckersOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Opponent",
+            values = CheckersLevel.entries.toList(),
+            selected = options.level,
+            display = { it.label },
+            onSelect = { onChange(options.copy(level = it)) },
+        )
+        ToggleRow(
+            title = "Flying kings",
+            subtitle = "A king slides the length of a diagonal and takes from a distance, " +
+                "as in the international game",
+            checked = options.flyingKings,
+            onChange = { onChange(options.copy(flyingKings = it)) },
+        )
+        ToggleRow(
+            title = "Crowning ends the turn",
+            subtitle = "A man jumping into the back row stops there. Turn this off and it " +
+                "carries on jumping as a man",
+            checked = options.crowningEndsTheTurn,
+            onChange = { onChange(options.copy(crowningEndsTheTurn = it)) },
+        )
+        ToggleRow(
+            title = "Threefold repetition",
+            subtitle = "The same position three times over is a draw",
+            checked = options.threefoldRepetition,
+            onChange = { onChange(options.copy(threefoldRepetition = it)) },
+        )
+        Text(
+            text = "Captures are always compulsory, and a multiple jump is one turn — " +
+                "there is no version of this game where you may stop halfway.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun BackgammonOptionsEditor(
+    options: BackgammonOptions,
+    onChange: (BackgammonOptions) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Opponent",
+            values = BackgammonLevel.entries.toList(),
+            selected = options.level,
+            display = { it.label },
+            onSelect = { onChange(options.copy(level = it)) },
+        )
+        ToggleRow(
+            title = "Count gammons",
+            subtitle = "A loser who bore nothing off has lost double, and one still on the " +
+                "bar has lost treble",
+            checked = options.countGammons,
+            onChange = { onChange(options.copy(countGammons = it)) },
+        )
+        Text(
+            text = "One game rather than a match, and no doubling cube: there is nothing " +
+                "to double when nothing is being kept.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun MastermindOptionsEditor(
+    options: MastermindOptions,
+    onChange: (MastermindOptions) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Opponent",
+            values = MastermindLevel.entries.toList(),
+            selected = options.level,
+            display = { it.label },
+            onSelect = { onChange(options.copy(level = it)) },
+        )
+        ChipRow(
+            label = "Colours",
+            values = listOf(6, 8),
+            selected = options.colours,
+            display = { "$it" },
+            onSelect = { colours ->
+                onChange(
+                    options.copy(
+                        colours = colours,
+                        // A code of distinct colours cannot be longer than the
+                        // number of colours there are.
+                        length = if (options.allowDuplicates) {
+                            options.length
+                        } else {
+                            options.length.coerceAtMost(colours)
+                        },
+                    )
+                )
+            },
+        )
+        ChipRow(
+            label = "Pegs",
+            values = listOf(3, 4, 5),
+            selected = options.length,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(length = it)) },
+        )
+        ChipRow(
+            label = "Guesses each",
+            values = listOf(8, 10, 12),
+            selected = options.maxGuesses,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(maxGuesses = it)) },
+        )
+        ToggleRow(
+            title = "Repeated colours",
+            subtitle = "A colour may appear more than once in the code",
+            checked = options.allowDuplicates,
+            onChange = { onChange(options.copy(allowDuplicates = it)) },
+        )
+        Text(
+            text = "${options.codeSpace()} possible codes. Both players are set one and " +
+                "both are breaking one, so cracking it in the same round as your " +
+                "opponent is a draw.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun PiratesOptionsEditor(
+    options: PiratesOptions,
+    playPirates: Boolean,
+    onChange: (PiratesOptions) -> Unit,
+    onSide: (Boolean) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "You play",
+            values = listOf(false, true),
+            selected = playPirates,
+            display = { if (it) "the two pirates" else "the twenty-four Bulgars" },
+            onSelect = onSide,
+        )
+        ChipRow(
+            label = "Opponent",
+            values = PiratesLevel.entries.toList(),
+            selected = options.level,
+            display = { it.label },
+            onSelect = { onChange(options.copy(level = it)) },
+        )
+        ToggleRow(
+            title = "A pirate who can take must take",
+            subtitle = "The rule that huffing exists to enforce, applied directly",
+            checked = options.captureIsCompulsory,
+            onChange = { onChange(options.copy(captureIsCompulsory = it)) },
+        )
+        ToggleRow(
+            title = "Bulgars may not retreat",
+            subtitle = "They press towards the stronghold or across, and never back",
+            checked = options.bulgarsMayNotRetreat,
+            onChange = { onChange(options.copy(bulgarsMayNotRetreat = it)) },
+        )
+        Text(
+            text = "The two sides are not playing the same game. The pirates take by " +
+                "jumping and win by cutting the Bulgars below the nine it takes to fill " +
+                "the stronghold; the Bulgars cannot take anything at all, and win by " +
+                "filling it or by leaving the pirates nowhere to go.",
             style = MaterialTheme.typography.bodySmall,
         )
     }

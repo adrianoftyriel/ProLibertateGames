@@ -38,7 +38,7 @@ private const val DEV_SUFFIX = "-dev"
 /**
  * Over-the-air updates from the repository's GitHub Releases.
  *
- * Release tags are v1.0.<run-number> and the APK's versionCode is that same run
+ * Release tags are v<series>.<run-number> and the APK's versionCode is that same run
  * number, so comparing the two is enough to tell whether a newer build exists.
  * The repository's releases must be publicly downloadable — no token is
  * embedded in the app, and GitHub blocks anonymous access to private assets.
@@ -112,7 +112,9 @@ class Updater(private val activity: Activity) {
 
     private fun toRelease(json: JSONObject): Release? {
         val tag = json.optString("tag_name").ifBlank { return null }
-        // Tags are v1.0.<n> or v1.0.<n>-dev; the run number is the trailing part.
+        // Tags are v<series>.<n>, with -dev on a prerelease. Only the trailing
+        // run number is read: the series is a name for people and changing it
+        // must not make an older build look newer.
         val versionCode = tag.substringAfterLast('.')
             .removeSuffix(DEV_SUFFIX)
             .toIntOrNull()

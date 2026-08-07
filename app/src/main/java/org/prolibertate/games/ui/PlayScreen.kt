@@ -31,10 +31,26 @@ import org.prolibertate.games.game.kaiser.KaiserMove
 import org.prolibertate.games.game.kaiser.KaiserPhase
 import org.prolibertate.games.game.kaiser.KaiserRules
 import org.prolibertate.games.game.kaiser.KaiserState
+import org.prolibertate.games.game.backgammon.BackgammonAi
+import org.prolibertate.games.game.backgammon.BackgammonMove
+import org.prolibertate.games.game.backgammon.BackgammonRules
+import org.prolibertate.games.game.backgammon.BackgammonState
+import org.prolibertate.games.game.checkers.CheckersAi
+import org.prolibertate.games.game.checkers.CheckersMove
+import org.prolibertate.games.game.checkers.CheckersRules
+import org.prolibertate.games.game.checkers.CheckersState
+import org.prolibertate.games.game.mastermind.MastermindAi
+import org.prolibertate.games.game.mastermind.MastermindMove
+import org.prolibertate.games.game.mastermind.MastermindRules
+import org.prolibertate.games.game.mastermind.MastermindState
 import org.prolibertate.games.game.morris.MorrisAi
 import org.prolibertate.games.game.morris.MorrisMove
 import org.prolibertate.games.game.morris.MorrisRules
 import org.prolibertate.games.game.morris.MorrisState
+import org.prolibertate.games.game.pirates.PiratesAi
+import org.prolibertate.games.game.pirates.PiratesMove
+import org.prolibertate.games.game.pirates.PiratesRules
+import org.prolibertate.games.game.pirates.PiratesState
 import org.prolibertate.games.game.president.PresidentAi
 import org.prolibertate.games.game.president.PresidentMove
 import org.prolibertate.games.game.president.PresidentPhase
@@ -55,12 +71,16 @@ import org.prolibertate.games.game.wizard.WizardRules
 import org.prolibertate.games.game.wizard.WizardState
 import org.prolibertate.games.net.MatchController
 import org.prolibertate.games.settings.Settings
+import org.prolibertate.games.ui.game.BackgammonScreen
+import org.prolibertate.games.ui.game.CheckersScreen
 import org.prolibertate.games.ui.game.ChessScreen
 import org.prolibertate.games.ui.game.CrazyEightsScreen
 import org.prolibertate.games.ui.game.EuchreScreen
 import org.prolibertate.games.ui.game.GolfScreen
 import org.prolibertate.games.ui.game.KaiserScreen
+import org.prolibertate.games.ui.game.MastermindScreen
 import org.prolibertate.games.ui.game.MorrisScreen
+import org.prolibertate.games.ui.game.PiratesScreen
 import org.prolibertate.games.ui.game.PresidentScreen
 import org.prolibertate.games.ui.game.TRICK_HOLD_MILLIS
 import org.prolibertate.games.ui.game.SequenceScreen
@@ -305,6 +325,76 @@ fun PlayScreen(
             }
             StartMatch(env, controller, route)
             TayuScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.CHECKERS -> {
+            val controller = remember(route) {
+                MatchController<CheckersState, CheckersMove>(
+                    rules = CheckersRules,
+                    ai = CheckersAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    aiThinkingMillis = { settings.scaled(250L) },
+                )
+            }
+            StartMatch(env, controller, route)
+            CheckersScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.BACKGAMMON -> {
+            val controller = remember(route) {
+                MatchController<BackgammonState, BackgammonMove>(
+                    rules = BackgammonRules,
+                    ai = BackgammonAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    // A checker at a time, so the pause is per checker rather
+                    // than per turn — half of it, or a double would take an age.
+                    aiThinkingMillis = { settings.scaled(350L) },
+                )
+            }
+            StartMatch(env, controller, route)
+            BackgammonScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.MASTERMIND -> {
+            val controller = remember(route) {
+                MatchController<MastermindState, MastermindMove>(
+                    rules = MastermindRules,
+                    ai = MastermindAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    aiThinkingMillis = { settings.scaled(900L) },
+                )
+            }
+            StartMatch(env, controller, route)
+            MastermindScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.PIRATES -> {
+            val controller = remember(route) {
+                MatchController<PiratesState, PiratesMove>(
+                    rules = PiratesRules,
+                    ai = PiratesAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    aiThinkingMillis = { settings.scaled(250L) },
+                )
+            }
+            StartMatch(env, controller, route)
+            PiratesScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
         }
 
         GameCatalog.MORRIS -> {

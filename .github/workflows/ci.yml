@@ -34,7 +34,7 @@ jobs:
       # Stamp the APK as a dev-channel build exactly when it is a build of the
       # dev branch, which is exactly when it can be published below. Pull
       # request builds run against refs/pull/N/merge, so they stay unstamped at
-      # 1.0.0-dev: they are never published and must not claim a channel
+      # <series>.0-dev: they are never published and must not claim a channel
       # version.
       #
       # This condition has to stay in step with the publish steps' own. Stamping
@@ -96,7 +96,12 @@ jobs:
         if: github.ref == 'refs/heads/dev'
         run: |
           set -euo pipefail
-          version="v1.0.${{ github.run_number }}-dev"
+          # The series comes from gradle.properties, which is the same file the
+          # build read when it stamped the APK — so the tag and what is inside
+          # it cannot name different versions.
+          series="$(sed -n 's/^plgVersionSeries=//p' gradle.properties)"
+          test -n "$series"
+          version="v${series}.${{ github.run_number }}-dev"
           src="app/build/outputs/apk/debug/app-debug.apk"
           dest="ProLibertateGames-${version}.apk"
           cp "$src" "$dest"
