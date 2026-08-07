@@ -49,7 +49,12 @@ jobs:
         id: stage
         run: |
           set -euo pipefail
-          version="v1.0.${{ github.run_number }}"
+          # The series comes from gradle.properties, which is the same file the
+          # build read when it stamped the APK — so the tag and what is inside
+          # it cannot name different versions.
+          series="$(sed -n 's/^plgVersionSeries=//p' gradle.properties)"
+          test -n "$series"
+          version="v${series}.${{ github.run_number }}"
           src="app/build/outputs/apk/debug/app-debug.apk"
           dest="ProLibertateGames-${version}.apk"
           cp "$src" "$dest"

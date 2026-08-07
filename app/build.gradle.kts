@@ -16,6 +16,11 @@ val buildChannel = System.getenv("PLG_CHANNEL").orEmpty()
 val runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "").toIntOrNull() ?: 0
 val stampVersion = buildChannel.isNotEmpty() && runNumber > 0
 
+// The version series, from gradle.properties. Both workflows read the same
+// property when they name a release tag, so the tag and the APK inside it
+// cannot disagree about which series they belong to.
+val versionSeries = (project.findProperty("plgVersionSeries") as String?) ?: "1.0"
+
 // Anything that is not an explicit production build is a dev build: ci.yml
 // stamps "dev", and a local build with nothing set counts as dev too.
 //
@@ -43,12 +48,15 @@ android {
         // know its own channel, so it must survive into the shipped APK. It
         // tracks isDevBuild rather than the stamp alone, so an unstamped local
         // build cannot end up claiming a channel its applicationId contradicts.
+        // versionCode stays the run number and nothing else, so it keeps
+        // climbing across a change of series: bumping 1.0 to 1.1 must not make
+        // an update look like a downgrade to Android.
         versionCode = if (stampVersion) runNumber else 1
         versionName = when {
-            stampVersion && buildChannel == "production" -> "1.0.$runNumber"
-            stampVersion -> "1.0.$runNumber-dev"
-            isDevBuild -> "1.0.0-dev"
-            else -> "1.0.0"
+            stampVersion && buildChannel == "production" -> "$versionSeries.$runNumber"
+            stampVersion -> "$versionSeries.$runNumber-dev"
+            isDevBuild -> "$versionSeries.0-dev"
+            else -> "$versionSeries.0"
         }
 
         // The launcher label. With both copies on the phone the app drawer shows
