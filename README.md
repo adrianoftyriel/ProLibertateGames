@@ -10,7 +10,7 @@ The app shell is complete and nine games are playable end to end:
 | | |
 | --- | --- |
 | **Playable** | Euchre, Kaiser, President, Golf, Wizard, Crazy 8s, Sequence, Chess, Ta Yü |
-| **Listed, not yet implemented** | Mastermind, Backgammon, Checkers |
+| **Listed, not yet implemented** | Mastermind, Backgammon, Checkers, Nine Men's Morris, Pirates and Bulgars |
 
 Unimplemented games appear in the menu marked *Coming soon* **on dev builds
 only** — a production release lists just the games that can actually be played,
