@@ -4,7 +4,7 @@ import kotlin.random.Random
 import org.prolibertate.games.game.engine.GameAi
 
 /**
- * A code breaker.
+ * A code setter and a code breaker.
  *
  * There is no tree to search here — the opponent makes no reply, and a guess
  * cannot be answered badly — so the whole game is in choosing which code to try
@@ -31,6 +31,19 @@ class MastermindAi(private val level: MastermindLevel? = null) :
         // Deterministic for a given position, so a host and a client watching
         // the same game agree on what the computer did.
         val random = Random(seat * 7919L + state.guesses[seat].size * 31L + state.options.hashCode())
+
+        // Choosing its own code, which is a different job from breaking one.
+        //
+        // Two deliberate things here. It does not try to be clever — a code
+        // picked to beat a particular solver is a code with a pattern in it,
+        // and a pattern is the one thing a code should not have. And it is the
+        // only choice in this file drawn from a source nobody else can see:
+        // every other random here is seeded from the position so a host and a
+        // client agree, but a code seeded from anything on the wire could be
+        // worked out by the player who is supposed to be guessing it.
+        if (state.phase == MastermindPhase.SETTING) {
+            return MastermindMove(MastermindRules.randomCode(state.options, Random.Default))
+        }
 
         if (setting == MastermindLevel.CASUAL) return legal[random.nextInt(legal.size)]
 

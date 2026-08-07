@@ -7,10 +7,16 @@ import kotlinx.serialization.Serializable
  *
  * The pencil-and-paper game is one person setting a code and another breaking
  * it, which makes a poor two-handed game: one player would sit and watch. Here
- * **both** players are set a code and both are breaking one, a guess each in
- * turn, and whoever cracks theirs first wins.
+ * **each player sets the code their opponent will have to break**, and then
+ * both are breaking one, a guess each in turn. Whoever cracks theirs first
+ * wins.
  *
- * That symmetry is what makes it fair to end the game at the foot of a round
+ * Setting your own code is the half of Mastermind a generated code takes away.
+ * Choosing it is a real decision — whether to repeat a colour, whether to leave
+ * one out — and it is a decision made against a particular opponent, which a
+ * random number generator cannot do.
+ *
+ * The symmetry is what makes it fair to end the game at the foot of a round
  * rather than the moment somebody gets it: if the first player cracks the code
  * on their sixth guess, the second player still gets a sixth guess to equal it,
  * and equalling it is a draw.
@@ -124,7 +130,14 @@ fun allCodes(options: MastermindOptions): List<List<Int>> {
 }
 
 @Serializable
-enum class MastermindPhase { GUESSING, GAME_OVER }
+enum class MastermindPhase {
+    /** Each player is choosing the code their opponent will have to break. */
+    SETTING,
+
+    /** Both codes are set and the guessing has started. */
+    GUESSING,
+    GAME_OVER,
+}
 
 @Serializable
 enum class MastermindOutcome(val label: String) {
@@ -141,8 +154,15 @@ data class MastermindState(
      * The code each seat is guarding, which is the one their opponent is trying
      * to break. Redacted before this ever leaves the host: see
      * [MastermindRules.viewFor].
+     *
+     * Empty means one of two quite different things — not chosen yet, or
+     * chosen and hidden from the device this copy was sent to — which is what
+     * [declared] is for. Without it a screen could not tell "they are still
+     * thinking" from "they are ready and you cannot see it".
      */
     val secrets: List<List<Int>>,
+    /** Whether each seat has settled on a code. */
+    val declared: List<Boolean>,
     /** What each seat has guessed at their opponent's code, oldest first. */
     val guesses: List<List<Guess>>,
     val turn: Int,
@@ -160,8 +180,11 @@ data class MastermindState(
 
     fun guessesLeft(seat: Int): Int = options.maxGuesses - guesses[seat].size
 
-    /** True where the secret has been stripped out for a client's view. */
-    fun isHidden(seat: Int): Boolean = secrets[seat].isEmpty()
+    /** True where a code has been set but stripped out of this copy. */
+    fun isHidden(seat: Int): Boolean = declared[seat] && secrets[seat].isEmpty()
+
+    /** True once this seat has chosen the code their opponent must break. */
+    fun hasSet(seat: Int): Boolean = declared[seat]
 }
 
 const val FIRST_SEAT = 0

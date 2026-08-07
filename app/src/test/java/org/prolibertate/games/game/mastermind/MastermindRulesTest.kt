@@ -2,24 +2,27 @@ package org.prolibertate.games.game.mastermind
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MastermindRulesTest {
 
-    private fun start(
-        options: MastermindOptions = MastermindOptions(),
-        seed: Long = 42L,
-    ) = MastermindRules.initialState(options, seed)
+    private fun start(options: MastermindOptions = MastermindOptions()) =
+        MastermindRules.initialState(options)
 
-    /** Sets both codes by hand, which is the only way to write a test about them. */
+    /**
+     * A game with both codes already set, reached the way a real one is: each
+     * player choosing theirs in turn.
+     */
     private fun withSecrets(
         first: List<Int>,
         second: List<Int>,
         options: MastermindOptions = MastermindOptions(),
-    ) = start(options).copy(secrets = listOf(first, second))
+    ): MastermindState {
+        val set = MastermindRules.applyMove(start(options), FIRST_SEAT, MastermindMove(first))
+        return MastermindRules.applyMove(set, SECOND_SEAT, MastermindMove(second))
+    }
 
     private fun guess(state: MastermindState, code: List<Int>) =
         MastermindRules.applyMove(state, state.turn, MastermindMove(code))
@@ -63,34 +66,86 @@ class MastermindRulesTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `both players are set a code of the right shape`() {
+    fun `a new game has no codes in it — the players set them`() {
         val state = start()
-        assertEquals(2, state.secrets.size)
-        state.secrets.forEach { secret ->
-            assertEquals(4, secret.size)
-            assertTrue(secret.all { it in 0 until 6 })
-        }
+        assertEquals(MastermindPhase.SETTING, state.phase)
         assertEquals(FIRST_SEAT, state.turn)
+        assertTrue(state.secrets.all { it.isEmpty() })
+        assertFalse(state.hasSet(FIRST_SEAT))
+        assertFalse(state.hasSet(SECOND_SEAT))
+        // Nothing is hidden yet, because there is nothing to hide.
+        assertFalse(state.isHidden(SECOND_SEAT))
+    }
+
+    @Test
+    fun `each player sets their own code, one after the other`() {
+        var state = start()
+        assertEquals(allCodes(state.options).size, MastermindRules.legalMoves(state, FIRST_SEAT).size)
+
+        state = MastermindRules.applyMove(state, FIRST_SEAT, MastermindMove(listOf(0, 1, 2, 3)))
+        assertEquals(MastermindPhase.SETTING, state.phase)
+        assertEquals(SECOND_SEAT, state.turn)
+        assertTrue(state.hasSet(FIRST_SEAT))
+        assertEquals(listOf(0, 1, 2, 3), state.secrets[FIRST_SEAT])
+
+        state = MastermindRules.applyMove(state, SECOND_SEAT, MastermindMove(listOf(4, 4, 5, 5)))
         assertEquals(MastermindPhase.GUESSING, state.phase)
+        // The guessing starts with the player who set first.
+        assertEquals(FIRST_SEAT, state.turn)
+        assertEquals(listOf(4, 4, 5, 5), state.secrets[SECOND_SEAT])
     }
 
     @Test
-    fun `the same seed sets the same codes, and a different one does not`() {
-        assertEquals(start(seed = 7L).secrets, start(seed = 7L).secrets)
-        assertNotEquals(start(seed = 7L).secrets, start(seed = 8L).secrets)
+    fun `the code you set is the one your opponent is breaking`() {
+        var state = withSecrets(first = listOf(0, 1, 2, 3), second = listOf(5, 5, 5, 5))
+        // The first player guesses at the second player's code, which is 5555.
+        state = guess(state, listOf(5, 5, 5, 5))
+        assertEquals(Feedback(4, 0), state.guesses[FIRST_SEAT].single().feedback)
     }
 
     @Test
-    fun `a game without duplicates never repeats a colour`() {
+    fun `a code the table does not allow is refused`() {
+        val state = start(MastermindOptions(colours = 6, length = 4, allowDuplicates = false))
+        assertTrue(
+            "a repeated colour on a no-repeats table",
+            runCatching {
+                MastermindRules.applyMove(state, FIRST_SEAT, MastermindMove(listOf(0, 0, 1, 2)))
+            }.exceptionOrNull() is IllegalArgumentException
+        )
+        assertTrue(
+            "the wrong number of pegs",
+            runCatching {
+                MastermindRules.applyMove(state, FIRST_SEAT, MastermindMove(listOf(0, 1, 2)))
+            }.exceptionOrNull() is IllegalArgumentException
+        )
+        // And a table without repeats offers only codes without repeats.
+        assertTrue(
+            MastermindRules.legalMoves(state, FIRST_SEAT)
+                .all { it.code.distinct().size == it.code.size }
+        )
+    }
+
+    @Test
+    fun `nobody sets a code twice`() {
+        val state = MastermindRules.applyMove(
+            start(),
+            FIRST_SEAT,
+            MastermindMove(listOf(0, 1, 2, 3)),
+        )
+        assertTrue(
+            runCatching {
+                MastermindRules.applyMove(state, FIRST_SEAT, MastermindMove(listOf(3, 2, 1, 0)))
+            }.exceptionOrNull() is IllegalArgumentException
+        )
+    }
+
+    @Test
+    fun `a table without duplicates counts a smaller space`() {
         val options = MastermindOptions(colours = 6, length = 4, allowDuplicates = false)
-        (0L until 20L).forEach { seed ->
-            MastermindRules.initialState(options, seed).secrets.forEach { secret ->
-                assertEquals(secret.size, secret.distinct().size)
-            }
-        }
-        // And the code space is the falling factorial rather than a power.
+        // The falling factorial rather than a power.
         assertEquals(6 * 5 * 4 * 3, options.codeSpace())
         assertEquals(6 * 5 * 4 * 3, allCodes(options).size)
+        assertTrue(allCodes(options).all { it.distinct().size == it.size })
     }
 
     @Test
@@ -105,6 +160,16 @@ class MastermindRulesTest {
     // -----------------------------------------------------------------------
     // Keeping the codes secret
     // -----------------------------------------------------------------------
+
+    @Test
+    fun `a code being chosen is not shown to the other player either`() {
+        val half = MastermindRules.applyMove(start(), FIRST_SEAT, MastermindMove(listOf(0, 1, 2, 3)))
+        val asSecond = MastermindRules.viewFor(half, SECOND_SEAT)
+        assertTrue("set and hidden", asSecond.isHidden(FIRST_SEAT))
+        // But that they are ready is not a secret, or the screen could not say so.
+        assertTrue(asSecond.hasSet(FIRST_SEAT))
+        assertFalse(asSecond.hasSet(SECOND_SEAT))
+    }
 
     @Test
     fun `a player is shown their own code and not the one they are breaking`() {
@@ -258,6 +323,7 @@ class MastermindRulesTest {
 
     @Test
     fun `the summary counts guesses without ever naming a colour`() {
+        assertEquals("Setting the codes — 0 of 2 chosen", MastermindRules.summary(start()))
         val state = withSecrets(listOf(0, 1, 2, 3), listOf(4, 5, 4, 5))
         assertEquals("Guess 1 of 10", MastermindRules.summary(state))
         val over = state.copy(

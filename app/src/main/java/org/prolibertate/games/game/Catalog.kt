@@ -120,8 +120,8 @@ object GameCatalog {
             minPlayers = 2,
             maxPlayers = 2,
             teamBased = false,
-            blurb = "Break the hidden code from black and white peg clues. " +
-                "Both players get one, and whoever cracks theirs first wins.",
+            blurb = "Set a code for your opponent and break the one they set for you. " +
+                "Whoever cracks theirs first wins.",
             available = true,
         ),
         GameDescriptor(

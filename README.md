@@ -274,8 +274,8 @@ game:
 - [Chess](docs/RULES-chess.md)
 - [Checkers](docs/RULES-checkers.md) — **note the caveat about flying kings**
 - [Backgammon](docs/RULES-backgammon.md) — **note that there is no doubling cube**
-- [Mastermind](docs/RULES-mastermind.md) — played as a duel, both players
-  guarding a code and breaking one
+- [Mastermind](docs/RULES-mastermind.md) — played as a duel: each player sets
+  the code the other has to break
 - [Nine Men's Morris](docs/RULES-morris.md)
 - [Pirates and Bulgars](docs/RULES-pirates.md) — **note the caveats about the
   reconstruction**: the book the theme comes from could not be obtained, so the
