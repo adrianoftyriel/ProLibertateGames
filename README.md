@@ -44,21 +44,37 @@ them.
 ## Scorekeeper
 
 **Scorekeeper** on the main menu is a pencil for games the app does not deal —
-darts, cribbage, whatever is actually on the table. Say how many are playing,
-name them, and write down what each of them scored every round; the running
-tally sits at the foot of the screen, where the one number anybody looks up is
-always visible.
+darts, cribbage, whatever is actually on the table. It is laid out as the paper
+it replaces: a column per player with their name at the head, a row per round
+running down the page, and the running total ruled off at the foot.
 
-Players can be renamed, added, removed or **dragged into a different order** at
-any point in a game. That works because points are recorded against a player's
-id rather than their position, so reordering the sheet moves the columns and
-nothing else. Ids are handed out once and never reused: somebody sitting down
-where somebody else got up starts at nought instead of inheriting a stranger's
-score. Removing a player does take their points with them — a score nobody can
-see is a score nobody can correct.
+```
+     Alice   Bob   Carol
+ 1     +3     −1      +2
+ 2     +5     +7       •
+ 3   [   ] [   ]  [   ]   ← the row being filled in
+ Σ      8      6       2
+```
 
-Rounds are not written in ink. Tapping one reopens it for correction or lets it
-be struck out, and the totals follow.
+The bottom row is always the one being filled in. Finish it and it is written
+down, and a fresh empty row opens above the totals for the next round. The
+totals and that button stay put while the rounds scroll under them, so the
+tally is never off-screen.
+
+Tap a column head to name it or remove that player; **drag it sideways to move
+the column**, and the whole column travels with the name. That works because
+points are recorded against a player's id rather than their position, so
+reordering the sheet moves the columns and nothing else. Ids are handed out
+once and never reused: somebody sitting down where somebody else got up starts
+at nought instead of inheriting a stranger's score. Removing a player does take
+their points with them — a score nobody can see is a score nobody can correct.
+
+Rounds are not written in ink. Tapping a round number down the left edge opens
+that row for correction or lets it be struck out, and the totals follow.
+
+Points are taken away by typing a minus, or with the **±** button, which flips
+the last number typed. Not every keyboard offers a minus on its number pad, and
+subtracting has to work on all of them.
 
 The sheet is saved as it is edited, so leaving the app or taking a phone call
 does not lose the game. It is kept in its own DataStore rather than with the
