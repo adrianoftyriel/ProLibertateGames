@@ -113,7 +113,7 @@ fun YahtzeeScreen(
             if (yours && canRoll) {
                 Button(
                     onClick = {
-                        controller.submit(RollDice(kept.toList()))
+                        controller.submit(RollDice(kept.toSet()))
                         // What was kept applied to the throw just made; the next
                         // one starts from whatever is on the table now.
                         kept.clear()
