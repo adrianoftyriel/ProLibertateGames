@@ -49,6 +49,7 @@ object GameCatalog {
      * joins [all] when its screen lands.
      */
     const val YAHTZEE = "yahtzee"
+    const val KLONDIKE = "klondike"
     const val SEQUENCE = "sequence"
     const val MASTERMIND = "mastermind"
     const val BACKGAMMON = "backgammon"
