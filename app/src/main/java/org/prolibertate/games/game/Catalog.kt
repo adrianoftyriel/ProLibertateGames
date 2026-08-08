@@ -41,6 +41,13 @@ object GameCatalog {
      * [all] when its screen lands.
      */
     const val HEARTS = "hearts"
+
+    /**
+     * Peg solitaire, likewise an id ahead of its screen. It is also the first
+     * game here played by one person, so it arrives with the seat-count change
+     * that allows it rather than before it.
+     */
+    const val PEG_SOLITAIRE = "pegsolitaire"
     const val SEQUENCE = "sequence"
     const val MASTERMIND = "mastermind"
     const val BACKGAMMON = "backgammon"
