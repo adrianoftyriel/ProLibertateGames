@@ -118,7 +118,7 @@ class YahtzeeRulesTest {
         val state = YahtzeeRules.initialState(config())
         assertEquals(0, YahtzeeRules.currentSeat(state))
         val legal = YahtzeeRules.legalMoves(state, 0)
-        assertEquals(listOf(RollDice(emptyList())), legal)
+        assertEquals(listOf(RollDice(emptySet())), legal)
         // Nothing may be written in before the dice have been thrown.
         assertThrows { YahtzeeRules.applyMove(state, 0, ScoreIn(YahtzeeCategory.CHANCE)) }
     }
@@ -142,15 +142,15 @@ class YahtzeeRulesTest {
         val again = YahtzeeRules.applyMove(state, 0, RollDice())
         assertEquals(once.dice, again.dice)
 
-        val keptOnce = YahtzeeRules.applyMove(once, 0, RollDice(listOf(0, 1)))
-        val keptAgain = YahtzeeRules.applyMove(once, 0, RollDice(listOf(0, 1)))
+        val keptOnce = YahtzeeRules.applyMove(once, 0, RollDice(setOf(0, 1)))
+        val keptAgain = YahtzeeRules.applyMove(once, 0, RollDice(setOf(0, 1)))
         assertEquals(keptOnce.dice, keptAgain.dice)
     }
 
     @Test
     fun `kept dice stay put and the rest are thrown again`() {
         val state = YahtzeeRules.applyMove(YahtzeeRules.initialState(config()), 0, RollDice())
-        val kept = YahtzeeRules.applyMove(state, 0, RollDice(listOf(0, 2, 4)))
+        val kept = YahtzeeRules.applyMove(state, 0, RollDice(setOf(0, 2, 4)))
         assertEquals(state.dice[0], kept.dice[0])
         assertEquals(state.dice[2], kept.dice[2])
         assertEquals(state.dice[4], kept.dice[4])
@@ -170,9 +170,39 @@ class YahtzeeRulesTest {
     }
 
     @Test
+    fun `the order dice were tapped in does not matter`() {
+        // The screen adds each die as it is tapped, so holding the third and
+        // then the first once gave [2, 0]. As a list that was a different move
+        // from [0, 2], and only the ascending one was ever offered as legal, so
+        // the controller dropped it and the throw did nothing at all.
+        val state = YahtzeeRules.applyMove(YahtzeeRules.initialState(config()), 0, RollDice())
+        assertEquals(RollDice(setOf(2, 0)), RollDice(setOf(0, 2)))
+
+        val legal = YahtzeeRules.legalMoves(state, 0)
+        assertTrue(
+            "a keep must be legal however it was built up",
+            legal.contains(RollDice(setOf(2, 0))),
+        )
+        // And it has to actually hold those dice.
+        val thrown = YahtzeeRules.applyMove(state, 0, RollDice(setOf(2, 0)))
+        assertEquals(state.dice[0], thrown.dice[0])
+        assertEquals(state.dice[2], thrown.dice[2])
+        assertEquals(2, thrown.rollsUsed)
+    }
+
+    @Test
+    fun `every way of keeping dice is on offer`() {
+        // Thirty-two subsets of five dice, and each of them exactly once.
+        val state = YahtzeeRules.applyMove(YahtzeeRules.initialState(config()), 0, RollDice())
+        val rolls = YahtzeeRules.legalMoves(state, 0).filterIsInstance<RollDice>()
+        assertEquals(32, rolls.size)
+        assertEquals(32, rolls.map { it.keep }.distinct().size)
+    }
+
+    @Test
     fun `nothing may be kept before the first throw`() {
         val state = YahtzeeRules.initialState(config())
-        assertThrows { YahtzeeRules.applyMove(state, 0, RollDice(listOf(0))) }
+        assertThrows { YahtzeeRules.applyMove(state, 0, RollDice(setOf(0))) }
     }
 
     @Test
@@ -277,7 +307,7 @@ class YahtzeeRulesTest {
         val state = YahtzeeRules.applyMove(YahtzeeRules.initialState(config()), 0, RollDice())
         assertEquals(state, YahtzeeRules.decodeState(YahtzeeRules.encodeState(state)))
 
-        val roll: YahtzeeMove = RollDice(listOf(0, 3))
+        val roll: YahtzeeMove = RollDice(setOf(0, 3))
         assertEquals(roll, YahtzeeRules.decodeMove(YahtzeeRules.encodeMove(roll)))
         val write: YahtzeeMove = ScoreIn(YahtzeeCategory.LARGE_STRAIGHT)
         assertEquals(write, YahtzeeRules.decodeMove(YahtzeeRules.encodeMove(write)))
