@@ -113,6 +113,30 @@ class KlondikeRulesTest {
     // ---- building ----------------------------------------------------------
 
     @Test
+    fun `the ace is low here, whatever the rest of the deck thinks`() {
+        // Rank.order puts the ace at fourteen, because the deck was built for
+        // trick-taking games where it is the highest card there is. Patience
+        // counts it as one, and every comparison in this game has to agree —
+        // otherwise a two can never follow an ace home and the game is
+        // unwinnable in a way nothing else would show.
+        assertEquals(14, Rank.ACE.order)
+        assertEquals(1, Rank.ACE.patienceOrder)
+        assertEquals(13, Rank.KING.patienceOrder)
+
+        var foundation = emptyList<Card>()
+        Rank.standard.sortedBy { it.patienceOrder }.forEach { rank ->
+            val card = c(rank, Suit.SPADES)
+            assertTrue("$rank should go home next", acceptsOnFoundation(foundation, card))
+            foundation = foundation + card
+        }
+        assertEquals(13, foundation.size)
+
+        // And a column runs the other way, down to an ace.
+        assertTrue(buildsDown(c(Rank.ACE, Suit.HEARTS), c(Rank.TWO, Suit.SPADES)))
+        assertTrue(buildsDown(c(Rank.QUEEN, Suit.HEARTS), c(Rank.KING, Suit.SPADES)))
+    }
+
+    @Test
     fun `foundations run ace upwards in one suit`() {
         assertTrue(acceptsOnFoundation(emptyList(), c(Rank.ACE, Suit.SPADES)))
         assertFalse(acceptsOnFoundation(emptyList(), c(Rank.TWO, Suit.SPADES)))

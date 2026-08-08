@@ -120,16 +120,26 @@ data class MoveCards(val from: Spot, val to: Spot, val count: Int = 1) : Klondik
 /** Foundations are indexed by suit, so a card always knows which one it wants. */
 fun foundationFor(card: Card): Int = card.suit.ordinal
 
+/**
+ * Where a rank sits when the ace is low.
+ *
+ * [Rank.order] puts the ace at fourteen, because the games this deck was built
+ * for are trick-taking ones where it is the highest card there is. Patience
+ * counts it the other way: foundations run ace upwards and columns run down to
+ * an ace, so every comparison here has to use this and not the raw order.
+ */
+val Rank.patienceOrder: Int get() = if (this == Rank.ACE) 1 else order
+
 /** Ace first, then strictly upwards in the same suit. */
 fun acceptsOnFoundation(foundation: List<Card>, card: Card): Boolean {
     val top = foundation.lastOrNull()
         ?: return card.rank == Rank.ACE
-    return card.suit == top.suit && card.rank.order == top.rank.order + 1
+    return card.suit == top.suit && card.rank.patienceOrder == top.rank.patienceOrder + 1
 }
 
 /** Down by one, and in the other colour. */
 fun buildsDown(lower: Card, onto: Card): Boolean =
-    lower.rank.order == onto.rank.order - 1 && lower.suit.isRed != onto.suit.isRed
+    lower.rank.patienceOrder == onto.rank.patienceOrder - 1 && lower.suit.isRed != onto.suit.isRed
 
 /**
  * Whether [cards] is a run that can travel as one: each card a step below the
