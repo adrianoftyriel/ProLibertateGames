@@ -4,7 +4,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import org.prolibertate.games.game.GameCatalog
 import org.prolibertate.games.game.chess.ChessAi
@@ -26,6 +29,33 @@ import org.prolibertate.games.game.euchre.EuchreMove
 import org.prolibertate.games.game.euchre.EuchrePhase
 import org.prolibertate.games.game.euchre.EuchreRules
 import org.prolibertate.games.game.euchre.EuchreState
+import org.prolibertate.games.game.freecell.FreeCellMove
+import org.prolibertate.games.game.freecell.FreeCellRules
+import org.prolibertate.games.game.freecell.FreeCellState
+import org.prolibertate.games.game.pyramid.PyramidMove
+import org.prolibertate.games.game.pyramid.PyramidRules
+import org.prolibertate.games.game.pyramid.PyramidState
+import org.prolibertate.games.game.solitaire.FirstLegalAi
+import org.prolibertate.games.game.spider.SpiderMove
+import org.prolibertate.games.game.spider.SpiderRules
+import org.prolibertate.games.game.spider.SpiderState
+import org.prolibertate.games.game.klondike.KlondikeAi
+import org.prolibertate.games.game.klondike.KlondikeMove
+import org.prolibertate.games.game.klondike.KlondikeRules
+import org.prolibertate.games.game.klondike.KlondikeState
+import org.prolibertate.games.game.yahtzee.YahtzeeAi
+import org.prolibertate.games.game.yahtzee.YahtzeeMove
+import org.prolibertate.games.game.yahtzee.YahtzeeRules
+import org.prolibertate.games.game.yahtzee.YahtzeeState
+import org.prolibertate.games.game.hearts.HeartsAi
+import org.prolibertate.games.game.hearts.HeartsMove
+import org.prolibertate.games.game.hearts.HeartsPhase
+import org.prolibertate.games.game.hearts.HeartsRules
+import org.prolibertate.games.game.hearts.HeartsState
+import org.prolibertate.games.game.pegsolitaire.PegSolitaireAi
+import org.prolibertate.games.game.pegsolitaire.PegSolitaireMove
+import org.prolibertate.games.game.pegsolitaire.PegSolitaireRules
+import org.prolibertate.games.game.pegsolitaire.PegSolitaireState
 import org.prolibertate.games.game.golf.GolfAi
 import org.prolibertate.games.game.golf.GolfMove
 import org.prolibertate.games.game.golf.GolfPhase
@@ -81,11 +111,18 @@ import org.prolibertate.games.ui.game.CheckersScreen
 import org.prolibertate.games.ui.game.ChessScreen
 import org.prolibertate.games.ui.game.CrazyEightsScreen
 import org.prolibertate.games.ui.game.CribbageScreen
+import org.prolibertate.games.ui.game.HeartsScreen
+import org.prolibertate.games.ui.game.FreeCellScreen
+import org.prolibertate.games.ui.game.KlondikeScreen
+import org.prolibertate.games.ui.game.PyramidScreen
 import org.prolibertate.games.ui.game.EuchreScreen
 import org.prolibertate.games.ui.game.GolfScreen
 import org.prolibertate.games.ui.game.KaiserScreen
 import org.prolibertate.games.ui.game.MastermindScreen
 import org.prolibertate.games.ui.game.MorrisScreen
+import org.prolibertate.games.ui.game.PegSolitaireScreen
+import org.prolibertate.games.ui.game.SpiderScreen
+import org.prolibertate.games.ui.game.YahtzeeScreen
 import org.prolibertate.games.ui.game.PiratesScreen
 import org.prolibertate.games.ui.game.PresidentScreen
 import org.prolibertate.games.ui.game.TRICK_HOLD_MILLIS
@@ -428,6 +465,162 @@ fun PlayScreen(
             }
             StartMatch(env, controller, route)
             PiratesScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.HEARTS -> {
+            val controller = remember(route) {
+                MatchController<HeartsState, HeartsMove>(
+                    rules = HeartsRules,
+                    ai = HeartsAi,
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    advanceIdle = { state ->
+                        if (state.phase == HeartsPhase.ROUND_OVER) {
+                            HeartsRules.startNextRound(state)
+                        } else {
+                            null
+                        }
+                    },
+                    // What a round cost is read before the next deal.
+                    awaitsConfirmation = { state -> state.phase == HeartsPhase.ROUND_OVER },
+                    aiThinkingMillis = { settings.scaled(700L) },
+                    holdBeforeNextMove = { state ->
+                        if (state.completedTrick.isNotEmpty()) {
+                            settings.scaled(TRICK_HOLD_MILLIS)
+                        } else {
+                            0L
+                        }
+                    },
+                )
+            }
+            StartMatch(env, controller, route)
+            HeartsScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.PEG_SOLITAIRE -> {
+            // Playing again means a fresh board rather than a fresh round, and
+            // it cannot go through advanceIdle: driveIdleSeats returns as soon
+            // as rules.isFinished is true, and a peg board with no jumps left
+            // genuinely is finished. Rebuilding the controller is the honest
+            // way to deal again, and the board is deterministic, so the retry
+            // is the same puzzle.
+            var generation by remember(route) { mutableIntStateOf(0) }
+            val controller = remember(route, generation) {
+                MatchController<PegSolitaireState, PegSolitaireMove>(
+                    rules = PegSolitaireRules,
+                    // Never consulted while a person holds the only seat.
+                    ai = PegSolitaireAi,
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                )
+            }
+            StartMatch(env, controller, route)
+            PegSolitaireScreen(
+                controller = controller,
+                onRestart = { generation++ },
+                onExit = onExit,
+            )
+        }
+
+        GameCatalog.YAHTZEE -> {
+            val controller = remember(route) {
+                MatchController<YahtzeeState, YahtzeeMove>(
+                    rules = YahtzeeRules,
+                    ai = YahtzeeAi,
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    // Long enough to watch the dice land, short enough that a
+                    // six-handed game is not an evening of waiting.
+                    aiThinkingMillis = { settings.scaled(500L) },
+                )
+            }
+            StartMatch(env, controller, route)
+            YahtzeeScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.KLONDIKE -> {
+            // Dealing again rebuilds the controller, for the same reason peg
+            // solitaire does: a blocked deal is genuinely finished, so
+            // driveIdleSeats has already stopped and advanceIdle never runs.
+            var generation by remember(route) { mutableIntStateOf(0) }
+            val controller = remember(route, generation) {
+                MatchController<KlondikeState, KlondikeMove>(
+                    rules = KlondikeRules,
+                    // Only ever asked for a hint; the seat is the player's.
+                    ai = KlondikeAi,
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                )
+            }
+            StartMatch(env, controller, route)
+            KlondikeScreen(
+                controller = controller,
+                onRestart = { generation++ },
+                onExit = onExit,
+            )
+        }
+
+        GameCatalog.FREECELL -> {
+            var generation by remember(route) { mutableIntStateOf(0) }
+            val controller = remember(route, generation) {
+                MatchController<FreeCellState, FreeCellMove>(
+                    rules = FreeCellRules,
+                    ai = FirstLegalAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                )
+            }
+            StartMatch(env, controller, route)
+            FreeCellScreen(controller = controller, onRestart = { generation++ }, onExit = onExit)
+        }
+
+        GameCatalog.SPIDER -> {
+            var generation by remember(route) { mutableIntStateOf(0) }
+            val controller = remember(route, generation) {
+                MatchController<SpiderState, SpiderMove>(
+                    rules = SpiderRules,
+                    ai = FirstLegalAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                )
+            }
+            StartMatch(env, controller, route)
+            SpiderScreen(controller = controller, onRestart = { generation++ }, onExit = onExit)
+        }
+
+        GameCatalog.PYRAMID -> {
+            var generation by remember(route) { mutableIntStateOf(0) }
+            val controller = remember(route, generation) {
+                MatchController<PyramidState, PyramidMove>(
+                    rules = PyramidRules,
+                    ai = FirstLegalAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                )
+            }
+            StartMatch(env, controller, route)
+            PyramidScreen(controller = controller, onRestart = { generation++ }, onExit = onExit)
         }
 
         GameCatalog.MORRIS -> {

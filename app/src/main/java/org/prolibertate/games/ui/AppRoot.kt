@@ -2,15 +2,17 @@ package org.prolibertate.games.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Button
@@ -36,7 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.prolibertate.games.R
 import org.prolibertate.games.game.GameCatalog
-import org.prolibertate.games.game.GameCategory
+import org.prolibertate.games.game.GameMenu
 import org.prolibertate.games.game.GameDescriptor
 import org.prolibertate.games.game.engine.TableConfig
 import org.prolibertate.games.net.LobbyController
@@ -64,6 +66,9 @@ class AppEnv(
  */
 sealed interface Route {
     data object Menu : Route
+
+    /** One section of the menu: its games, and any sub-section under it. */
+    data class Section(val menu: GameMenu) : Route
     data object Settings : Route
     data object Scorekeeper : Route
     data class Setup(val gameId: String) : Route
@@ -152,10 +157,18 @@ private fun AppContent(
             // Dev builds show the games that are not finished yet; production
             // releases list only what can actually be played.
             showComingSoon = showComingSoon,
-            onPickGame = { push(Route.Setup(it.id)) },
+            onPickSection = { push(Route.Section(it)) },
             onJoinGame = { push(Route.Lobby(gameId = "", optionsJson = "{}", hosting = false)) },
             onScorekeeper = { push(Route.Scorekeeper) },
             onSettings = { push(Route.Settings) },
+        )
+
+        is Route.Section -> SectionScreen(
+            menu = route.menu,
+            showComingSoon = showComingSoon,
+            onPickGame = { push(Route.Setup(it.id)) },
+            onPickSection = { push(Route.Section(it)) },
+            onBack = pop,
         )
 
         is Route.Settings -> SettingsScreen(
@@ -202,11 +215,11 @@ private fun AppContent(
 // Main menu
 // ---------------------------------------------------------------------------
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainMenuScreen(
     showComingSoon: Boolean,
-    onPickGame: (GameDescriptor) -> Unit,
+    onPickSection: (GameMenu) -> Unit,
     onJoinGame: () -> Unit,
     onScorekeeper: () -> Unit,
     onSettings: () -> Unit,
@@ -221,51 +234,157 @@ fun MainMenuScreen(
             )
         }
     ) { padding ->
-        Column(
+        // Only the top of the tree. Trick-taking is reached through Card Games,
+        // which is where somebody looking for it would go.
+        val sections = GameMenu.entries.filter {
+            it.isTopLevel && GameCatalog.hasAnything(it, includeComingSoon = showComingSoon)
+        }
+
+        // One column, held in the middle. There are only ever a handful of
+        // entries here now that the games themselves live a level down, and a
+        // short list spread across a grid reads as a page half empty rather
+        // than as a menu. Capped in width so it does not become a row of very
+        // wide buttons on a tablet.
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            // Wraps rather than running off the edge: two buttons and a narrow
-            // phone would otherwise push the second one past the screen.
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 340.dp)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                OutlinedButton(onClick = onJoinGame) { Text("Join a game nearby") }
+                sections.forEach { section ->
+                    SectionTile(
+                        menu = section,
+                        count = countIn(section, showComingSoon),
+                        onClick = { onPickSection(section) },
+                    )
+                }
+
+                // Below the games, and full width like them, so the column
+                // stays one column all the way down.
+                OutlinedButton(
+                    onClick = onJoinGame,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                ) { Text("Join a game nearby") }
                 // Not a game, and deliberately not in the catalogue: it keeps
                 // score for whatever is being played on the actual table.
-                OutlinedButton(onClick = onScorekeeper) { Text("Scorekeeper") }
+                OutlinedButton(
+                    onClick = onScorekeeper,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Scorekeeper") }
             }
+        }
+    }
+}
 
-            // The column count follows the available width, so a phone in
-            // portrait gets two and a tablet in landscape gets four or more.
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 172.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                GameCategory.entries.forEach { category ->
-                    val games = GameCatalog.byCategory(category, includeComingSoon = showComingSoon)
-                    // Don't leave a heading stranded over nothing.
-                    if (games.isEmpty()) return@forEach
 
-                    item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = category.label,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-                        )
-                    }
-                    items(games) { game ->
-                        GameTile(game = game, onClick = { onPickGame(game) })
-                    }
+/**
+ * How many games a section offers, counting whatever is under it as well.
+ *
+ * A game in both a section and its sub-section is one game, not two, so this
+ * counts a set rather than adding the lists together.
+ */
+private fun countIn(menu: GameMenu, showComingSoon: Boolean): Int =
+    (GameCatalog.inMenu(menu, showComingSoon) +
+        menu.children.flatMap { GameCatalog.inMenu(it, showComingSoon) })
+        .toSet().size
+
+/**
+ * One section of the menu.
+ *
+ * Sub-sections come first and its own games after, so Card Games opens on
+ * "Trick-taking" and then everything played with a pack — including the
+ * trick-taking games themselves, which belong in both places and are listed in
+ * both. A game reachable one way and not the other would just be a game
+ * somebody could not find.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SectionScreen(
+    menu: GameMenu,
+    showComingSoon: Boolean,
+    onPickGame: (GameDescriptor) -> Unit,
+    onPickSection: (GameMenu) -> Unit,
+    onBack: () -> Unit,
+) {
+    val children = menu.children.filter {
+        GameCatalog.hasAnything(it, includeComingSoon = showComingSoon)
+    }
+    val games = GameCatalog.inMenu(menu, includeComingSoon = showComingSoon)
+
+    ScreenScaffold(title = menu.label, onBack = onBack) { modifier ->
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 172.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = modifier.fillMaxSize(),
+        ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    text = menu.blurb,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
+            items(children) { child ->
+                SectionTile(
+                    menu = child,
+                    count = countIn(child, showComingSoon),
+                    onClick = { onPickSection(child) },
+                )
+            }
+            if (games.isNotEmpty() && children.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        text = "All ${menu.label.lowercase()}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+                    )
                 }
             }
+            items(games) { game ->
+                GameTile(game = game, onClick = { onPickGame(game) })
+            }
+        }
+    }
+}
+
+/** A way into a section, rather than into a game. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SectionTile(menu: GameMenu, count: Int, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = menu.label,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = menu.blurb,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                text = if (count == 1) "1 game" else "$count games",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
     }
 }
@@ -297,14 +416,12 @@ private fun GameTile(game: GameDescriptor, onClick: () -> Unit) {
                 modifier = Modifier.padding(top = 4.dp),
             )
             Text(
-                text = if (game.available) {
-                    if (game.minPlayers == game.maxPlayers) {
-                        "${game.minPlayers} players"
-                    } else {
-                        "${game.minPlayers}–${game.maxPlayers} players"
-                    }
-                } else {
-                    "Coming soon"
+                text = when {
+                    !game.available -> "Coming soon"
+                    // A puzzle for one, rather than "1 players".
+                    game.maxPlayers == 1 -> "On your own"
+                    game.minPlayers == game.maxPlayers -> "${game.minPlayers} players"
+                    else -> "${game.minPlayers}–${game.maxPlayers} players"
                 },
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(top = 8.dp),

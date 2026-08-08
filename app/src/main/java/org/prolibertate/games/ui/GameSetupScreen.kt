@@ -40,6 +40,15 @@ import org.prolibertate.games.game.crazyeights.CrazyEightsOptions
 import org.prolibertate.games.game.cribbage.CribbageOptions
 import org.prolibertate.games.game.euchre.EuchreOptions
 import org.prolibertate.games.game.golf.GolfOptions
+import org.prolibertate.games.game.hearts.HeartsOptions
+import org.prolibertate.games.game.klondike.KlondikeOptions
+import org.prolibertate.games.game.freecell.FreeCellOptions
+import org.prolibertate.games.game.pyramid.PyramidOptions
+import org.prolibertate.games.game.spider.SpiderOptions
+import org.prolibertate.games.game.yahtzee.YahtzeeOptions
+import org.prolibertate.games.game.pegsolitaire.PegBoard
+import org.prolibertate.games.game.pegsolitaire.PegGoal
+import org.prolibertate.games.game.pegsolitaire.PegSolitaireOptions
 import org.prolibertate.games.game.kaiser.KaiserOptions
 import org.prolibertate.games.game.mastermind.MastermindLevel
 import org.prolibertate.games.game.mastermind.MastermindOptions
@@ -88,6 +97,13 @@ fun GameSetupScreen(
     var backgammon by remember { mutableStateOf(BackgammonOptions()) }
     var mastermind by remember { mutableStateOf(MastermindOptions()) }
     var pirates by remember { mutableStateOf(PiratesOptions()) }
+    var hearts by remember { mutableStateOf(HeartsOptions()) }
+    var pegs by remember { mutableStateOf(PegSolitaireOptions()) }
+    var yahtzee by remember { mutableStateOf(YahtzeeOptions()) }
+    var klondike by remember { mutableStateOf(KlondikeOptions()) }
+    var freecell by remember { mutableStateOf(FreeCellOptions()) }
+    var spider by remember { mutableStateOf(SpiderOptions()) }
+    var pyramid by remember { mutableStateOf(PyramidOptions()) }
     // Not an engine option: which seat the local player takes. Seat 0 is
     // always White, so choosing Black means sitting in seat 1.
     var playWhite by remember { mutableStateOf(true) }
@@ -111,6 +127,13 @@ fun GameSetupScreen(
         GameCatalog.BACKGAMMON -> setupJson.encodeToString(backgammon)
         GameCatalog.MASTERMIND -> setupJson.encodeToString(mastermind)
         GameCatalog.PIRATES -> setupJson.encodeToString(pirates)
+        GameCatalog.HEARTS -> setupJson.encodeToString(hearts)
+        GameCatalog.PEG_SOLITAIRE -> setupJson.encodeToString(pegs)
+        GameCatalog.YAHTZEE -> setupJson.encodeToString(yahtzee)
+        GameCatalog.KLONDIKE -> setupJson.encodeToString(klondike)
+        GameCatalog.FREECELL -> setupJson.encodeToString(freecell)
+        GameCatalog.SPIDER -> setupJson.encodeToString(spider)
+        GameCatalog.PYRAMID -> setupJson.encodeToString(pyramid)
         else -> "{}"
     }
     val seatCount = seatCountFor(descriptor.id, optionsJson)
@@ -162,15 +185,37 @@ fun GameSetupScreen(
                     onSide = { playPirates = it },
                 )
 
+                GameCatalog.HEARTS -> HeartsOptionsEditor(hearts) { hearts = it }
+
+                GameCatalog.PEG_SOLITAIRE -> PegSolitaireOptionsEditor(pegs) { pegs = it }
+
+                GameCatalog.YAHTZEE -> YahtzeeOptionsEditor(yahtzee) { yahtzee = it }
+
+                GameCatalog.KLONDIKE -> KlondikeOptionsEditor(klondike) { klondike = it }
+
+                GameCatalog.FREECELL -> FreeCellOptionsEditor(freecell) { freecell = it }
+
+                GameCatalog.SPIDER -> SpiderOptionsEditor(spider) { spider = it }
+
+                GameCatalog.PYRAMID -> PyramidOptionsEditor(pyramid) { pyramid = it }
+
                 else -> Text("No options yet for this game.")
             }
 
             Divider()
-            Text("Opponents", fontWeight = FontWeight.Bold)
+            // A one-seat game has nobody to play against and no seat anyone
+            // could join, so it is offered as itself rather than as a table
+            // with every other chair filled by the computer.
+            val solo = seatCount == 1
+            Text(if (solo) "On your own" else "Opponents", fontWeight = FontWeight.Bold)
             Text(
-                text = "Play now and every other seat is taken by the computer. Host a game " +
-                    "instead and people can claim those seats as they join — whatever is " +
-                    "still empty when you start stays computer-controlled.",
+                text = if (solo) {
+                    "A puzzle for one. There is nobody to wait for and nothing to host."
+                } else {
+                    "Play now and every other seat is taken by the computer. Host a game " +
+                        "instead and people can claim those seats as they join — whatever is " +
+                        "still empty when you start stays computer-controlled."
+                },
                 style = MaterialTheme.typography.bodySmall,
             )
 
@@ -182,14 +227,16 @@ fun GameSetupScreen(
                 descriptor.id == GameCatalog.PIRATES && playPirates -> 1
                 else -> 0
             }
-            PrimaryAction(text = "Play against the computer") {
+            PrimaryAction(text = if (solo) "Play" else "Play against the computer") {
                 onPlayOffline(
                     offlineConfig(descriptor.id, optionsJson, seatCount, playerName, localSeat),
                     localSeat,
                 )
             }
-            PrimaryAction(text = "Host a game for others to join") {
-                onHostOnline(optionsJson)
+            if (!solo) {
+                PrimaryAction(text = "Host a game for others to join") {
+                    onHostOnline(optionsJson)
+                }
             }
         }
     }
@@ -249,6 +296,9 @@ fun seatCountFor(gameId: String, optionsJson: String): Int {
 
             GameCatalog.CHESS, GameCatalog.MORRIS, GameCatalog.CHECKERS,
             GameCatalog.BACKGAMMON, GameCatalog.MASTERMIND, GameCatalog.PIRATES -> 2
+
+            GameCatalog.YAHTZEE ->
+                setupJson.decodeFromString<YahtzeeOptions>(optionsJson).playerCount
 
             GameCatalog.TAYU ->
                 setupJson.decodeFromString<TayuOptions>(optionsJson).playerCount
@@ -943,4 +993,151 @@ private fun ToggleRow(
         }
         Switch(checked = checked, onCheckedChange = onChange)
     }
+}
+
+@Composable
+private fun HeartsOptionsEditor(options: HeartsOptions, onChange: (HeartsOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Game ends at",
+            values = listOf(50, 100),
+            selected = options.targetScore,
+            display = { "$it points" },
+            onSelect = { onChange(options.copy(targetScore = it)) },
+        )
+        ToggleRow(
+            title = "Shooting the moon",
+            subtitle = "Take all twenty-six and score nothing, while everyone else takes " +
+                "the lot. Switched off, a moon is simply the worst hand at the table.",
+            checked = options.allowShootTheMoon,
+            onChange = { onChange(options.copy(allowShootTheMoon = it)) },
+        )
+    }
+}
+
+@Composable
+private fun PegSolitaireOptionsEditor(
+    options: PegSolitaireOptions,
+    onChange: (PegSolitaireOptions) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Board",
+            values = PegBoard.entries.toList(),
+            selected = options.board,
+            display = { it.label },
+            // The opening hole is cleared as well: a hole that exists on the old
+            // board may be a missing corner on the new one, and the options
+            // refuse to be built that way.
+            onSelect = { onChange(options.copy(board = it, startEmpty = null)) },
+        )
+        ChipRow(
+            label = "Finish",
+            values = PegGoal.entries.toList(),
+            selected = options.goal,
+            display = { it.label },
+            onSelect = { onChange(options.copy(goal = it)) },
+        )
+    }
+}
+
+@Composable
+private fun YahtzeeOptionsEditor(options: YahtzeeOptions, onChange: (YahtzeeOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Players",
+            values = (1..6).toList(),
+            selected = options.playerCount,
+            display = { if (it == 1) "On your own" else "$it" },
+            onSelect = { onChange(options.copy(playerCount = it)) },
+        )
+        ToggleRow(
+            title = "Second Yahtzee scores a hundred",
+            subtitle = "Only once the Yahtzee box holds the fifty. A zero written there " +
+                "earlier forfeits it, as the printed rule has it.",
+            checked = options.yahtzeeBonus,
+            onChange = { onChange(options.copy(yahtzeeBonus = it)) },
+        )
+    }
+}
+
+@Composable
+private fun KlondikeOptionsEditor(options: KlondikeOptions, onChange: (KlondikeOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Turn from the stock",
+            values = listOf(1, 3),
+            selected = options.drawCount,
+            display = { "$it at a time" },
+            onSelect = { onChange(options.copy(drawCount = it)) },
+        )
+        ChipRow(
+            label = "Turning the waste back over",
+            values = listOf(null, 0, 1, 2),
+            selected = options.redealLimit,
+            display = {
+                when (it) {
+                    null -> "As often as you like"
+                    0 -> "Never — one pass"
+                    else -> "$it times"
+                }
+            },
+            onSelect = { onChange(options.copy(redealLimit = it)) },
+        )
+        ToggleRow(
+            title = "Only a king fills a space",
+            subtitle = "Turning this off lets any card into an empty column, which makes " +
+                "far more deals winnable.",
+            checked = options.kingsOnlyInSpaces,
+            onChange = { onChange(options.copy(kingsOnlyInSpaces = it)) },
+        )
+    }
+}
+
+@Composable
+private fun FreeCellOptionsEditor(options: FreeCellOptions, onChange: (FreeCellOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Free cells",
+            values = (1..6).toList(),
+            selected = options.freeCells,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(freeCells = it)) },
+        )
+        ToggleRow(
+            title = "Move a run in one go",
+            subtitle = "The rules move a run one card at a time through the cells. This " +
+                "does the shuffling for you, which is bookkeeping rather than a decision.",
+            checked = options.allowSupermoves,
+            onChange = { onChange(options.copy(allowSupermoves = it)) },
+        )
+    }
+}
+
+@Composable
+private fun SpiderOptionsEditor(options: SpiderOptions, onChange: (SpiderOptions) -> Unit) {
+    ChipRow(
+        label = "Suits",
+        values = listOf(1, 2, 4),
+        selected = options.suits,
+        display = {
+            when (it) {
+                1 -> "One — a pastime"
+                2 -> "Two"
+                else -> "Four — a fight"
+            }
+        },
+        onSelect = { onChange(options.copy(suits = it)) },
+    )
+}
+
+@Composable
+private fun PyramidOptionsEditor(options: PyramidOptions, onChange: (PyramidOptions) -> Unit) {
+    ChipRow(
+        label = "Turns through the pack",
+        values = listOf(0, 1, 2, 3),
+        selected = options.redeals,
+        display = { if (it == 0) "One pass only" else "$it turns back" },
+        onSelect = { onChange(options.copy(redeals = it)) },
+    )
 }
