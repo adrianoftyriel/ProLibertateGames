@@ -29,6 +29,14 @@ import org.prolibertate.games.game.euchre.EuchreMove
 import org.prolibertate.games.game.euchre.EuchrePhase
 import org.prolibertate.games.game.euchre.EuchreRules
 import org.prolibertate.games.game.euchre.EuchreState
+import org.prolibertate.games.game.klondike.KlondikeAi
+import org.prolibertate.games.game.klondike.KlondikeMove
+import org.prolibertate.games.game.klondike.KlondikeRules
+import org.prolibertate.games.game.klondike.KlondikeState
+import org.prolibertate.games.game.yahtzee.YahtzeeAi
+import org.prolibertate.games.game.yahtzee.YahtzeeMove
+import org.prolibertate.games.game.yahtzee.YahtzeeRules
+import org.prolibertate.games.game.yahtzee.YahtzeeState
 import org.prolibertate.games.game.hearts.HeartsAi
 import org.prolibertate.games.game.hearts.HeartsMove
 import org.prolibertate.games.game.hearts.HeartsPhase
@@ -94,12 +102,14 @@ import org.prolibertate.games.ui.game.ChessScreen
 import org.prolibertate.games.ui.game.CrazyEightsScreen
 import org.prolibertate.games.ui.game.CribbageScreen
 import org.prolibertate.games.ui.game.HeartsScreen
+import org.prolibertate.games.ui.game.KlondikeScreen
 import org.prolibertate.games.ui.game.EuchreScreen
 import org.prolibertate.games.ui.game.GolfScreen
 import org.prolibertate.games.ui.game.KaiserScreen
 import org.prolibertate.games.ui.game.MastermindScreen
 import org.prolibertate.games.ui.game.MorrisScreen
 import org.prolibertate.games.ui.game.PegSolitaireScreen
+import org.prolibertate.games.ui.game.YahtzeeScreen
 import org.prolibertate.games.ui.game.PiratesScreen
 import org.prolibertate.games.ui.game.PresidentScreen
 import org.prolibertate.games.ui.game.TRICK_HOLD_MILLIS
@@ -499,6 +509,50 @@ fun PlayScreen(
             }
             StartMatch(env, controller, route)
             PegSolitaireScreen(
+                controller = controller,
+                onRestart = { generation++ },
+                onExit = onExit,
+            )
+        }
+
+        GameCatalog.YAHTZEE -> {
+            val controller = remember(route) {
+                MatchController<YahtzeeState, YahtzeeMove>(
+                    rules = YahtzeeRules,
+                    ai = YahtzeeAi,
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                    // Long enough to watch the dice land, short enough that a
+                    // six-handed game is not an evening of waiting.
+                    aiThinkingMillis = { settings.scaled(500L) },
+                )
+            }
+            StartMatch(env, controller, route)
+            YahtzeeScreen(controller = controller, localSeat = route.localSeat, onExit = onExit)
+        }
+
+        GameCatalog.KLONDIKE -> {
+            // Dealing again rebuilds the controller, for the same reason peg
+            // solitaire does: a blocked deal is genuinely finished, so
+            // driveIdleSeats has already stopped and advanceIdle never runs.
+            var generation by remember(route) { mutableIntStateOf(0) }
+            val controller = remember(route, generation) {
+                MatchController<KlondikeState, KlondikeMove>(
+                    rules = KlondikeRules,
+                    // Only ever asked for a hint; the seat is the player's.
+                    ai = KlondikeAi,
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                )
+            }
+            StartMatch(env, controller, route)
+            KlondikeScreen(
                 controller = controller,
                 onRestart = { generation++ },
                 onExit = onExit,

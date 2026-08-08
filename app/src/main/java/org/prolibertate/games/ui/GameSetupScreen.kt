@@ -41,6 +41,8 @@ import org.prolibertate.games.game.cribbage.CribbageOptions
 import org.prolibertate.games.game.euchre.EuchreOptions
 import org.prolibertate.games.game.golf.GolfOptions
 import org.prolibertate.games.game.hearts.HeartsOptions
+import org.prolibertate.games.game.klondike.KlondikeOptions
+import org.prolibertate.games.game.yahtzee.YahtzeeOptions
 import org.prolibertate.games.game.pegsolitaire.PegBoard
 import org.prolibertate.games.game.pegsolitaire.PegGoal
 import org.prolibertate.games.game.pegsolitaire.PegSolitaireOptions
@@ -94,6 +96,8 @@ fun GameSetupScreen(
     var pirates by remember { mutableStateOf(PiratesOptions()) }
     var hearts by remember { mutableStateOf(HeartsOptions()) }
     var pegs by remember { mutableStateOf(PegSolitaireOptions()) }
+    var yahtzee by remember { mutableStateOf(YahtzeeOptions()) }
+    var klondike by remember { mutableStateOf(KlondikeOptions()) }
     // Not an engine option: which seat the local player takes. Seat 0 is
     // always White, so choosing Black means sitting in seat 1.
     var playWhite by remember { mutableStateOf(true) }
@@ -119,6 +123,8 @@ fun GameSetupScreen(
         GameCatalog.PIRATES -> setupJson.encodeToString(pirates)
         GameCatalog.HEARTS -> setupJson.encodeToString(hearts)
         GameCatalog.PEG_SOLITAIRE -> setupJson.encodeToString(pegs)
+        GameCatalog.YAHTZEE -> setupJson.encodeToString(yahtzee)
+        GameCatalog.KLONDIKE -> setupJson.encodeToString(klondike)
         else -> "{}"
     }
     val seatCount = seatCountFor(descriptor.id, optionsJson)
@@ -173,6 +179,10 @@ fun GameSetupScreen(
                 GameCatalog.HEARTS -> HeartsOptionsEditor(hearts) { hearts = it }
 
                 GameCatalog.PEG_SOLITAIRE -> PegSolitaireOptionsEditor(pegs) { pegs = it }
+
+                GameCatalog.YAHTZEE -> YahtzeeOptionsEditor(yahtzee) { yahtzee = it }
+
+                GameCatalog.KLONDIKE -> KlondikeOptionsEditor(klondike) { klondike = it }
 
                 else -> Text("No options yet for this game.")
             }
@@ -271,6 +281,9 @@ fun seatCountFor(gameId: String, optionsJson: String): Int {
 
             GameCatalog.CHESS, GameCatalog.MORRIS, GameCatalog.CHECKERS,
             GameCatalog.BACKGAMMON, GameCatalog.MASTERMIND, GameCatalog.PIRATES -> 2
+
+            GameCatalog.YAHTZEE ->
+                setupJson.decodeFromString<YahtzeeOptions>(optionsJson).playerCount
 
             GameCatalog.TAYU ->
                 setupJson.decodeFromString<TayuOptions>(optionsJson).playerCount
@@ -1009,6 +1022,59 @@ private fun PegSolitaireOptionsEditor(
             selected = options.goal,
             display = { it.label },
             onSelect = { onChange(options.copy(goal = it)) },
+        )
+    }
+}
+
+@Composable
+private fun YahtzeeOptionsEditor(options: YahtzeeOptions, onChange: (YahtzeeOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Players",
+            values = (1..6).toList(),
+            selected = options.playerCount,
+            display = { if (it == 1) "On your own" else "$it" },
+            onSelect = { onChange(options.copy(playerCount = it)) },
+        )
+        ToggleRow(
+            title = "Second Yahtzee scores a hundred",
+            subtitle = "Only once the Yahtzee box holds the fifty. A zero written there " +
+                "earlier forfeits it, as the printed rule has it.",
+            checked = options.yahtzeeBonus,
+            onChange = { onChange(options.copy(yahtzeeBonus = it)) },
+        )
+    }
+}
+
+@Composable
+private fun KlondikeOptionsEditor(options: KlondikeOptions, onChange: (KlondikeOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Turn from the stock",
+            values = listOf(1, 3),
+            selected = options.drawCount,
+            display = { "$it at a time" },
+            onSelect = { onChange(options.copy(drawCount = it)) },
+        )
+        ChipRow(
+            label = "Turning the waste back over",
+            values = listOf(null, 0, 1, 2),
+            selected = options.redealLimit,
+            display = {
+                when (it) {
+                    null -> "As often as you like"
+                    0 -> "Never — one pass"
+                    else -> "$it times"
+                }
+            },
+            onSelect = { onChange(options.copy(redealLimit = it)) },
+        )
+        ToggleRow(
+            title = "Only a king fills a space",
+            subtitle = "Turning this off lets any card into an empty column, which makes " +
+                "far more deals winnable.",
+            checked = options.kingsOnlyInSpaces,
+            onChange = { onChange(options.copy(kingsOnlyInSpaces = it)) },
         )
     }
 }

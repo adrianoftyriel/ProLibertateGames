@@ -73,6 +73,8 @@ class CatalogTest {
                 GameCatalog.CRIBBAGE,
                 GameCatalog.HEARTS,
                 GameCatalog.PEG_SOLITAIRE,
+                GameCatalog.YAHTZEE,
+                GameCatalog.KLONDIKE,
                 GameCatalog.WIZARD,
                 GameCatalog.CHESS,
                 GameCatalog.TAYU,
