@@ -40,13 +40,48 @@ class CatalogTest {
     }
 
     @Test
-    fun `a game can be in more than one menu`() {
-        // The whole point of the set. A patience is solitaire and a card game;
-        // Euchre is a card game and a trick-taking one.
+    fun `a game belongs to several menus but is listed in exactly one`() {
+        // The set says what a game is; home says where it is filed. Klondike
+        // really is a card game, and is still not listed among them.
         val klondike = GameCatalog.byId(GameCatalog.KLONDIKE)!!
         assertTrue(klondike.menus.containsAll(setOf(GameMenu.SOLITAIRE, GameMenu.CARDS)))
+        assertEquals(GameMenu.SOLITAIRE, klondike.home)
         assertTrue(GameCatalog.inMenu(GameMenu.SOLITAIRE).contains(klondike))
-        assertTrue(GameCatalog.inMenu(GameMenu.CARDS).contains(klondike))
+        assertFalse(
+            "a patience is filed under Solitaire and nowhere else",
+            GameCatalog.inMenu(GameMenu.CARDS).contains(klondike),
+        )
+    }
+
+    @Test
+    fun `no game is listed twice`() {
+        // The whole point of the change: every section is a partial duplicate
+        // of another the moment one game appears in two of them.
+        val listed = GameMenu.entries.flatMap { GameCatalog.inMenu(it) }
+        assertEquals("a game is listed more than once", listed.size, listed.distinct().size)
+        assertEquals(GameCatalog.all.size, listed.size)
+    }
+
+    @Test
+    fun `home follows the priority order`() {
+        // Solitaire, then trick-taking, then the rest of the card games, then
+        // board games — which is the declaration order of the enum, and the
+        // only place that order is written down.
+        assertEquals(
+            listOf(GameMenu.SOLITAIRE, GameMenu.TRICK_TAKING, GameMenu.CARDS, GameMenu.BOARD),
+            GameMenu.entries.toList(),
+        )
+        // Solitaire beats cards.
+        assertEquals(
+            GameMenu.SOLITAIRE,
+            GameCatalog.byId(GameCatalog.PEG_SOLITAIRE)!!.home,
+        )
+        // Trick-taking beats cards.
+        assertEquals(GameMenu.TRICK_TAKING, GameCatalog.byId(GameCatalog.HEARTS)!!.home)
+        assertEquals(GameMenu.TRICK_TAKING, GameCatalog.byId(GameCatalog.EUCHRE)!!.home)
+        // Nothing above it, so it stays where it is.
+        assertEquals(GameMenu.CARDS, GameCatalog.byId(GameCatalog.CRIBBAGE)!!.home)
+        assertEquals(GameMenu.BOARD, GameCatalog.byId(GameCatalog.CHESS)!!.home)
     }
 
     @Test
@@ -58,11 +93,15 @@ class CatalogTest {
 
         val tricks = GameCatalog.inMenu(GameMenu.TRICK_TAKING)
         assertTrue("there should be some", tricks.isNotEmpty())
-        // A sub-menu that listed something its parent did not would be a game
-        // you could reach one way and not the other.
+        // They are card games, and say so — they are simply filed one level in
+        // rather than listed twice.
         assertTrue(
             "every trick-taking game is also a card game",
             tricks.all { it.menus.contains(GameMenu.CARDS) },
+        )
+        assertTrue(
+            "and none of them is listed among the card games as well",
+            GameCatalog.inMenu(GameMenu.CARDS).none { it.menus.contains(GameMenu.TRICK_TAKING) },
         )
     }
 

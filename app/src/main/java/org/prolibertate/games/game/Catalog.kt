@@ -10,8 +10,8 @@ package org.prolibertate.games.game
  */
 enum class GameMenu(val label: String, val blurb: String) {
     SOLITAIRE("Solitaire", "Played alone, against the deal or the board."),
-    CARDS("Card Games", "Anything played with a pack."),
     TRICK_TAKING("Trick-taking", "Lead, follow, and count what you took."),
+    CARDS("Card Games", "Anything else played with a pack."),
     BOARD("Board Games", "Boards, pieces and dice."),
     ;
 
@@ -29,9 +29,11 @@ data class GameDescriptor(
     val id: String,
     val title: String,
     /**
-     * Every menu this game appears under. A patience is both solitaire and a
-     * card game, and Euchre is both a card game and a trick-taking one — so
-     * this is a set, and the same game is listed in each place it belongs.
+     * Every menu this game could belong to. Klondike really is both a patience
+     * and a card game, and Euchre really is both a card game and a trick-taking
+     * one, so this stays a set: it is what the game *is*.
+     *
+     * Where it is *listed* is [home], which is only ever one place.
      */
     val menus: Set<GameMenu>,
     val minPlayers: Int,
@@ -40,7 +42,22 @@ data class GameDescriptor(
     val teamBased: Boolean,
     val blurb: String,
     val available: Boolean,
-)
+) {
+    /**
+     * The one menu this game is listed under.
+     *
+     * The first of its menus in [GameMenu] declaration order, which is the
+     * priority: solitaire first, then trick-taking, then the rest of the card
+     * games, then board games. So a patience is filed under Solitaire rather
+     * than repeated under Card Games, and Euchre under Trick-taking rather than
+     * in both places above it.
+     *
+     * Listing a game twice made every section a partial duplicate of another,
+     * and a menu that repeats itself is harder to scan than a longer one that
+     * does not.
+     */
+    val home: GameMenu get() = GameMenu.entries.first { menus.contains(it) }
+}
 
 /**
  * The catalogue the menus are built from.
@@ -207,8 +224,11 @@ object GameCatalog {
         ),
         GameDescriptor(
             id = SEQUENCE,
+            // Played with two packs, but a board game to anyone who owns it,
+            // and cards outrank board in the priority — so listing it as both
+            // would quietly file it away from where people look for it.
             title = "Sequence",
-            menus = setOf(GameMenu.BOARD, GameMenu.CARDS),
+            menus = setOf(GameMenu.BOARD),
             minPlayers = 2,
             maxPlayers = 12,
             teamBased = true,
@@ -330,7 +350,7 @@ object GameCatalog {
         menu: GameMenu,
         includeComingSoon: Boolean = true,
     ): List<GameDescriptor> = all.filter {
-        it.menus.contains(menu) && (includeComingSoon || it.available)
+        it.home == menu && (includeComingSoon || it.available)
     }
 
     /**
