@@ -28,9 +28,8 @@ object YahtzeeAi : GameAi<YahtzeeState, YahtzeeMove> {
         if (rolls.isEmpty()) return best ?: writes.first()
         if (bestScore >= WORTH_KEEPING) return best!!
 
-        val keep = whatToKeep(state.dice)
-        return rolls.firstOrNull { it.keep.sorted() == keep.sorted() }
-            ?: rolls.first()
+        val keep = whatToKeep(state.dice).toSet()
+        return rolls.firstOrNull { it.keep == keep } ?: rolls.first()
     }
 
     /**

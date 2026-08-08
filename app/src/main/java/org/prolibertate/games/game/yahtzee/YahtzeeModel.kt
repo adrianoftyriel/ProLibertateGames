@@ -132,10 +132,16 @@ sealed interface YahtzeeMove
  * Positions rather than faces: two fives are two different dice, and a player
  * who keeps one of them and rerolls the other is doing something a set of faces
  * could not express.
+ *
+ * A set rather than a list, because holding the third die and then the first is
+ * the same act as holding the first and then the third. As a list those were two
+ * different moves, and only the ascending one was ever offered as legal — so
+ * keeping dice in any other order was silently dropped and the throw did
+ * nothing.
  */
 @Serializable
 @SerialName("roll")
-data class RollDice(val keep: List<Int> = emptyList()) : YahtzeeMove
+data class RollDice(val keep: Set<Int> = emptySet()) : YahtzeeMove
 
 @Serializable
 @SerialName("score")

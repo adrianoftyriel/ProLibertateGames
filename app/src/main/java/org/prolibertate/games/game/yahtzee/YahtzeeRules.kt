@@ -53,7 +53,7 @@ object YahtzeeRules : GameRules<YahtzeeState, YahtzeeMove> {
             // The first throw of a turn is all five dice: there is nothing on
             // the table yet to keep.
             moves += if (!state.hasRolled) {
-                listOf(RollDice(emptyList()))
+                listOf(RollDice(emptySet()))
             } else {
                 keepSubsets().map { RollDice(it) }
             }
@@ -67,9 +67,9 @@ object YahtzeeRules : GameRules<YahtzeeState, YahtzeeMove> {
     }
 
     /** Every set of dice positions a player might hold back — thirty-two of them. */
-    private fun keepSubsets(): List<List<Int>> =
+    private fun keepSubsets(): List<Set<Int>> =
         (0 until (1 shl DICE_COUNT)).map { mask ->
-            (0 until DICE_COUNT).filter { mask and (1 shl it) != 0 }
+            (0 until DICE_COUNT).filter { mask and (1 shl it) != 0 }.toSet()
         }
 
     override fun applyMove(state: YahtzeeState, seat: Int, move: YahtzeeMove): YahtzeeState {
@@ -83,7 +83,6 @@ object YahtzeeRules : GameRules<YahtzeeState, YahtzeeMove> {
 
     private fun applyRoll(state: YahtzeeState, move: RollDice): YahtzeeState {
         require(state.rollsUsed < ROLLS_PER_TURN) { "No rolls left this turn" }
-        require(move.keep.distinct().size == move.keep.size) { "Cannot keep a die twice" }
         require(move.keep.all { it in 0 until DICE_COUNT }) { "No such die" }
         require(state.hasRolled || move.keep.isEmpty()) { "Nothing to keep before the first roll" }
         return state.copy(
@@ -92,7 +91,7 @@ object YahtzeeRules : GameRules<YahtzeeState, YahtzeeMove> {
         )
     }
 
-    private fun throwDice(state: YahtzeeState, keep: List<Int>): List<Int> {
+    private fun throwDice(state: YahtzeeState, keep: Set<Int>): List<Int> {
         val random = Random(
             state.seed +
                 state.round * 10_000L +
