@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import org.prolibertate.games.game.cards.Card
 import org.prolibertate.games.game.cards.Rank
 import org.prolibertate.games.game.cards.Suit
+import org.prolibertate.games.game.solitaire.buildsDownAlternating
 
 const val TABLEAU_PILES: Int = 7
 const val FOUNDATIONS: Int = 4
@@ -121,25 +122,13 @@ data class MoveCards(val from: Spot, val to: Spot, val count: Int = 1) : Klondik
 fun foundationFor(card: Card): Int = card.suit.ordinal
 
 /**
- * Where a rank sits when the ace is low.
+ * Down by one and in the other colour.
  *
- * [Rank.order] puts the ace at fourteen, because the games this deck was built
- * for are trick-taking ones where it is the highest card there is. Patience
- * counts it the other way: foundations run ace upwards and columns run down to
- * an ace, so every comparison here has to use this and not the raw order.
+ * Named here because it is what this game builds with, but the rule itself is
+ * shared: FreeCell builds the same way, Spider builds in suit, and all of them
+ * need the same ace-low ordering underneath.
  */
-val Rank.patienceOrder: Int get() = if (this == Rank.ACE) 1 else order
-
-/** Ace first, then strictly upwards in the same suit. */
-fun acceptsOnFoundation(foundation: List<Card>, card: Card): Boolean {
-    val top = foundation.lastOrNull()
-        ?: return card.rank == Rank.ACE
-    return card.suit == top.suit && card.rank.patienceOrder == top.rank.patienceOrder + 1
-}
-
-/** Down by one, and in the other colour. */
-fun buildsDown(lower: Card, onto: Card): Boolean =
-    lower.rank.patienceOrder == onto.rank.patienceOrder - 1 && lower.suit.isRed != onto.suit.isRed
+fun buildsDown(lower: Card, onto: Card): Boolean = buildsDownAlternating(lower, onto)
 
 /**
  * Whether [cards] is a run that can travel as one: each card a step below the

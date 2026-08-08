@@ -13,6 +13,8 @@ import org.prolibertate.games.game.cards.Suit
 import org.prolibertate.games.game.engine.PlayerKind
 import org.prolibertate.games.game.engine.PlayerSlot
 import org.prolibertate.games.game.engine.TableConfig
+import org.prolibertate.games.game.solitaire.acceptsOnFoundation
+import org.prolibertate.games.game.solitaire.patienceOrder
 
 class KlondikeRulesTest {
 

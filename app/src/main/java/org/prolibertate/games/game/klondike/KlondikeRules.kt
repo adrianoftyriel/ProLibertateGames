@@ -8,6 +8,7 @@ import org.prolibertate.games.game.cards.Decks
 import org.prolibertate.games.game.cards.shuffledWith
 import org.prolibertate.games.game.engine.GameRules
 import org.prolibertate.games.game.engine.TableConfig
+import org.prolibertate.games.game.solitaire.acceptsOnFoundation
 import kotlin.random.Random
 
 /**
