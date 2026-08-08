@@ -40,6 +40,9 @@ object GameCatalog {
 
     const val YAHTZEE = "yahtzee"
     const val KLONDIKE = "klondike"
+    const val FREECELL = "freecell"
+    const val SPIDER = "spider"
+    const val PYRAMID = "pyramid"
     const val SEQUENCE = "sequence"
     const val MASTERMIND = "mastermind"
     const val BACKGAMMON = "backgammon"
