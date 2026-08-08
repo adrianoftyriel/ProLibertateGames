@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -82,6 +83,11 @@ fun YahtzeeScreen(
         return
     }
 
+    // A turn starts with the dice back in the cup, and its first throw must
+    // keep nothing — a selection carried over from the last turn would be
+    // refused, and the Throw button would look broken again.
+    LaunchedEffect(current.turn, current.round) { kept.clear() }
+
     val yours = current.turn == localSeat && !current.isOver
     val canRoll = legal.any { it is RollDice }
     val writable = legal.filterIsInstance<ScoreIn>().map { it.category }.toSet()
@@ -114,9 +120,11 @@ fun YahtzeeScreen(
                 Button(
                     onClick = {
                         controller.submit(RollDice(kept.toSet()))
-                        // What was kept applied to the throw just made; the next
-                        // one starts from whatever is on the table now.
-                        kept.clear()
+                        // The selection stays. A kept die does not move or
+                        // change, so the hold a player just made is still the
+                        // hold they want — asking them to pick the same three
+                        // again between every throw is work the screen can do
+                        // for them.
                     },
                 ) {
                     Text(if (current.hasRolled) "Throw the rest" else "Throw")
