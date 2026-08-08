@@ -42,6 +42,9 @@ import org.prolibertate.games.game.euchre.EuchreOptions
 import org.prolibertate.games.game.golf.GolfOptions
 import org.prolibertate.games.game.hearts.HeartsOptions
 import org.prolibertate.games.game.klondike.KlondikeOptions
+import org.prolibertate.games.game.freecell.FreeCellOptions
+import org.prolibertate.games.game.pyramid.PyramidOptions
+import org.prolibertate.games.game.spider.SpiderOptions
 import org.prolibertate.games.game.yahtzee.YahtzeeOptions
 import org.prolibertate.games.game.pegsolitaire.PegBoard
 import org.prolibertate.games.game.pegsolitaire.PegGoal
@@ -98,6 +101,9 @@ fun GameSetupScreen(
     var pegs by remember { mutableStateOf(PegSolitaireOptions()) }
     var yahtzee by remember { mutableStateOf(YahtzeeOptions()) }
     var klondike by remember { mutableStateOf(KlondikeOptions()) }
+    var freecell by remember { mutableStateOf(FreeCellOptions()) }
+    var spider by remember { mutableStateOf(SpiderOptions()) }
+    var pyramid by remember { mutableStateOf(PyramidOptions()) }
     // Not an engine option: which seat the local player takes. Seat 0 is
     // always White, so choosing Black means sitting in seat 1.
     var playWhite by remember { mutableStateOf(true) }
@@ -125,6 +131,9 @@ fun GameSetupScreen(
         GameCatalog.PEG_SOLITAIRE -> setupJson.encodeToString(pegs)
         GameCatalog.YAHTZEE -> setupJson.encodeToString(yahtzee)
         GameCatalog.KLONDIKE -> setupJson.encodeToString(klondike)
+        GameCatalog.FREECELL -> setupJson.encodeToString(freecell)
+        GameCatalog.SPIDER -> setupJson.encodeToString(spider)
+        GameCatalog.PYRAMID -> setupJson.encodeToString(pyramid)
         else -> "{}"
     }
     val seatCount = seatCountFor(descriptor.id, optionsJson)
@@ -183,6 +192,12 @@ fun GameSetupScreen(
                 GameCatalog.YAHTZEE -> YahtzeeOptionsEditor(yahtzee) { yahtzee = it }
 
                 GameCatalog.KLONDIKE -> KlondikeOptionsEditor(klondike) { klondike = it }
+
+                GameCatalog.FREECELL -> FreeCellOptionsEditor(freecell) { freecell = it }
+
+                GameCatalog.SPIDER -> SpiderOptionsEditor(spider) { spider = it }
+
+                GameCatalog.PYRAMID -> PyramidOptionsEditor(pyramid) { pyramid = it }
 
                 else -> Text("No options yet for this game.")
             }
@@ -1077,4 +1092,52 @@ private fun KlondikeOptionsEditor(options: KlondikeOptions, onChange: (KlondikeO
             onChange = { onChange(options.copy(kingsOnlyInSpaces = it)) },
         )
     }
+}
+
+@Composable
+private fun FreeCellOptionsEditor(options: FreeCellOptions, onChange: (FreeCellOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Free cells",
+            values = (1..6).toList(),
+            selected = options.freeCells,
+            display = { "$it" },
+            onSelect = { onChange(options.copy(freeCells = it)) },
+        )
+        ToggleRow(
+            title = "Move a run in one go",
+            subtitle = "The rules move a run one card at a time through the cells. This " +
+                "does the shuffling for you, which is bookkeeping rather than a decision.",
+            checked = options.allowSupermoves,
+            onChange = { onChange(options.copy(allowSupermoves = it)) },
+        )
+    }
+}
+
+@Composable
+private fun SpiderOptionsEditor(options: SpiderOptions, onChange: (SpiderOptions) -> Unit) {
+    ChipRow(
+        label = "Suits",
+        values = listOf(1, 2, 4),
+        selected = options.suits,
+        display = {
+            when (it) {
+                1 -> "One — a pastime"
+                2 -> "Two"
+                else -> "Four — a fight"
+            }
+        },
+        onSelect = { onChange(options.copy(suits = it)) },
+    )
+}
+
+@Composable
+private fun PyramidOptionsEditor(options: PyramidOptions, onChange: (PyramidOptions) -> Unit) {
+    ChipRow(
+        label = "Turns through the pack",
+        values = listOf(0, 1, 2, 3),
+        selected = options.redeals,
+        display = { if (it == 0) "One pass only" else "$it turns back" },
+        onSelect = { onChange(options.copy(redeals = it)) },
+    )
 }

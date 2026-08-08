@@ -29,6 +29,16 @@ import org.prolibertate.games.game.euchre.EuchreMove
 import org.prolibertate.games.game.euchre.EuchrePhase
 import org.prolibertate.games.game.euchre.EuchreRules
 import org.prolibertate.games.game.euchre.EuchreState
+import org.prolibertate.games.game.freecell.FreeCellMove
+import org.prolibertate.games.game.freecell.FreeCellRules
+import org.prolibertate.games.game.freecell.FreeCellState
+import org.prolibertate.games.game.pyramid.PyramidMove
+import org.prolibertate.games.game.pyramid.PyramidRules
+import org.prolibertate.games.game.pyramid.PyramidState
+import org.prolibertate.games.game.solitaire.FirstLegalAi
+import org.prolibertate.games.game.spider.SpiderMove
+import org.prolibertate.games.game.spider.SpiderRules
+import org.prolibertate.games.game.spider.SpiderState
 import org.prolibertate.games.game.klondike.KlondikeAi
 import org.prolibertate.games.game.klondike.KlondikeMove
 import org.prolibertate.games.game.klondike.KlondikeRules
@@ -102,13 +112,16 @@ import org.prolibertate.games.ui.game.ChessScreen
 import org.prolibertate.games.ui.game.CrazyEightsScreen
 import org.prolibertate.games.ui.game.CribbageScreen
 import org.prolibertate.games.ui.game.HeartsScreen
+import org.prolibertate.games.ui.game.FreeCellScreen
 import org.prolibertate.games.ui.game.KlondikeScreen
+import org.prolibertate.games.ui.game.PyramidScreen
 import org.prolibertate.games.ui.game.EuchreScreen
 import org.prolibertate.games.ui.game.GolfScreen
 import org.prolibertate.games.ui.game.KaiserScreen
 import org.prolibertate.games.ui.game.MastermindScreen
 import org.prolibertate.games.ui.game.MorrisScreen
 import org.prolibertate.games.ui.game.PegSolitaireScreen
+import org.prolibertate.games.ui.game.SpiderScreen
 import org.prolibertate.games.ui.game.YahtzeeScreen
 import org.prolibertate.games.ui.game.PiratesScreen
 import org.prolibertate.games.ui.game.PresidentScreen
@@ -557,6 +570,57 @@ fun PlayScreen(
                 onRestart = { generation++ },
                 onExit = onExit,
             )
+        }
+
+        GameCatalog.FREECELL -> {
+            var generation by remember(route) { mutableIntStateOf(0) }
+            val controller = remember(route, generation) {
+                MatchController<FreeCellState, FreeCellMove>(
+                    rules = FreeCellRules,
+                    ai = FirstLegalAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                )
+            }
+            StartMatch(env, controller, route)
+            FreeCellScreen(controller = controller, onRestart = { generation++ }, onExit = onExit)
+        }
+
+        GameCatalog.SPIDER -> {
+            var generation by remember(route) { mutableIntStateOf(0) }
+            val controller = remember(route, generation) {
+                MatchController<SpiderState, SpiderMove>(
+                    rules = SpiderRules,
+                    ai = FirstLegalAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                )
+            }
+            StartMatch(env, controller, route)
+            SpiderScreen(controller = controller, onRestart = { generation++ }, onExit = onExit)
+        }
+
+        GameCatalog.PYRAMID -> {
+            var generation by remember(route) { mutableIntStateOf(0) }
+            val controller = remember(route, generation) {
+                MatchController<PyramidState, PyramidMove>(
+                    rules = PyramidRules,
+                    ai = FirstLegalAi(),
+                    config = route.config,
+                    scope = scope,
+                    role = role,
+                    localSeats = setOf(route.localSeat),
+                    primarySeat = route.localSeat,
+                )
+            }
+            StartMatch(env, controller, route)
+            PyramidScreen(controller = controller, onRestart = { generation++ }, onExit = onExit)
         }
 
         GameCatalog.MORRIS -> {
