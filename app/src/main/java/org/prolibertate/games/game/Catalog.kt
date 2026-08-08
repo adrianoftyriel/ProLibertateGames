@@ -42,6 +42,13 @@ object GameCatalog {
      */
     const val HEARTS = "hearts"
     const val PEG_SOLITAIRE = "pegsolitaire"
+
+    /**
+     * An id ahead of its screen: the engine is written and tested, but a
+     * catalogue entry with nothing behind it would crash on the first tap, so it
+     * joins [all] when its screen lands.
+     */
+    const val YAHTZEE = "yahtzee"
     const val SEQUENCE = "sequence"
     const val MASTERMIND = "mastermind"
     const val BACKGAMMON = "backgammon"
