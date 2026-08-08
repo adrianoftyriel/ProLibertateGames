@@ -117,6 +117,27 @@ class UpdatePolicyTest {
         )
     }
 
+    // -- What a check on launch is allowed to say ---------------------------
+
+    @Test
+    fun `a check on launch speaks only when there is something to install`() {
+        assertEquals(devBuild, launchOffer(UpdateVerdict.Install(devBuild)))
+    }
+
+    @Test
+    fun `a check on launch says nothing when there is nothing to say`() {
+        assertNull("an up-to-date app has no business interrupting", launchOffer(UpdateVerdict.UpToDate))
+        assertNull(
+            "a phone with no network has nothing to apologise for",
+            launchOffer(UpdateVerdict.Refused("Unable to resolve host api.github.com")),
+        )
+        // Including the refusal that this whole change exists to produce: being
+        // shown the other channel's build is not a thing to be told about.
+        assertNull(
+            launchOffer(verdictFor(productionBuild, UpdateChannel.DEV, installedVersionCode = 1)),
+        )
+    }
+
     /**
      * The two sequences genuinely overlap — production is on 40 while dev is on
      * 69 — so a build's own number is meaningless on the other channel. This is

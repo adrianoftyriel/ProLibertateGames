@@ -66,6 +66,19 @@ fun versionCodeOfTag(tag: String): Int? =
     tag.substringAfterLast('.').removeSuffix(DEV_SUFFIX).toIntOrNull()
 
 /**
+ * The build a check on launch should interrupt somebody for, or null to say
+ * nothing at all.
+ *
+ * Only an actual update is worth a word. Opening the app is not asking a
+ * question, so a check that finds nothing — or that cannot reach GitHub at all
+ * — stays quiet; a phone on a train would otherwise be told off for it every
+ * single launch. The button in Settings *is* asking a question, and reports
+ * every answer including those two.
+ */
+fun launchOffer(verdict: UpdateVerdict): Release? =
+    (verdict as? UpdateVerdict.Install)?.release
+
+/**
  * Whether [latest] should be offered to a build of [installedChannel] at
  * [installedVersionCode].
  *

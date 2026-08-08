@@ -97,6 +97,12 @@ it: every rule above is a pure function and unit-tested on the JVM.
   builds from `dev`. The settings screen states which one is running rather than
   offering a switch.
 
+  The check on launch **only ever speaks when there is a build to install**. It
+  runs behind the splash and waits for it to clear, and an app that is already
+  current — or a phone that cannot reach GitHub — says nothing, because opening
+  the app was not a question. The button in Settings is a question, so it
+  answers every time, including "you're on the latest" and whatever went wrong.
+
   Wanting both means installing both — they are separate apps and each updates
   itself, see [Both channels on one device](#both-channels-on-one-device).
 

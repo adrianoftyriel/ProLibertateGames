@@ -129,6 +129,11 @@ fun AppRoot(env: AppEnv) {
         if (!splashDone) {
             SplashScreen(onFinished = { splashDone = true })
         }
+
+        // Looks while the splash is up and waits until it has gone before
+        // saying anything, so the check costs nothing in time and cannot
+        // interrupt the opening of the app.
+        LaunchUpdateCheck(env = env, visible = splashDone)
     }
 }
 
