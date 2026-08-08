@@ -93,11 +93,13 @@ import org.prolibertate.games.ui.game.CheckersScreen
 import org.prolibertate.games.ui.game.ChessScreen
 import org.prolibertate.games.ui.game.CrazyEightsScreen
 import org.prolibertate.games.ui.game.CribbageScreen
+import org.prolibertate.games.ui.game.HeartsScreen
 import org.prolibertate.games.ui.game.EuchreScreen
 import org.prolibertate.games.ui.game.GolfScreen
 import org.prolibertate.games.ui.game.KaiserScreen
 import org.prolibertate.games.ui.game.MastermindScreen
 import org.prolibertate.games.ui.game.MorrisScreen
+import org.prolibertate.games.ui.game.PegSolitaireScreen
 import org.prolibertate.games.ui.game.PiratesScreen
 import org.prolibertate.games.ui.game.PresidentScreen
 import org.prolibertate.games.ui.game.TRICK_HOLD_MILLIS
