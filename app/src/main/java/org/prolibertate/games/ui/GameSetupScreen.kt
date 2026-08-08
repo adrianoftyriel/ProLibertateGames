@@ -37,6 +37,7 @@ import org.prolibertate.games.game.checkers.CheckersOptions
 import org.prolibertate.games.game.chess.ChessLevel
 import org.prolibertate.games.game.chess.ChessOptions
 import org.prolibertate.games.game.crazyeights.CrazyEightsOptions
+import org.prolibertate.games.game.cribbage.CribbageOptions
 import org.prolibertate.games.game.euchre.EuchreOptions
 import org.prolibertate.games.game.golf.GolfOptions
 import org.prolibertate.games.game.kaiser.KaiserOptions
@@ -78,6 +79,7 @@ fun GameSetupScreen(
     var golf by remember { mutableStateOf(GolfOptions()) }
     var kaiser by remember { mutableStateOf(KaiserOptions()) }
     var crazyEights by remember { mutableStateOf(CrazyEightsOptions()) }
+    var cribbage by remember { mutableStateOf(CribbageOptions()) }
     var wizard by remember { mutableStateOf(WizardOptions()) }
     var chess by remember { mutableStateOf(ChessOptions()) }
     var tayu by remember { mutableStateOf(TayuOptions()) }
@@ -100,6 +102,7 @@ fun GameSetupScreen(
         GameCatalog.GOLF -> setupJson.encodeToString(golf)
         GameCatalog.KAISER -> setupJson.encodeToString(kaiser)
         GameCatalog.CRAZY_EIGHTS -> setupJson.encodeToString(crazyEights)
+        GameCatalog.CRIBBAGE -> setupJson.encodeToString(cribbage)
         GameCatalog.WIZARD -> setupJson.encodeToString(wizard)
         GameCatalog.CHESS -> setupJson.encodeToString(chess)
         GameCatalog.TAYU -> setupJson.encodeToString(tayu)
@@ -131,6 +134,8 @@ fun GameSetupScreen(
                 GameCatalog.CRAZY_EIGHTS -> CrazyEightsOptionsEditor(crazyEights) {
                     crazyEights = it
                 }
+
+                GameCatalog.CRIBBAGE -> CribbageOptionsEditor(cribbage) { cribbage = it }
 
                 GameCatalog.WIZARD -> WizardOptionsEditor(wizard) { wizard = it }
                 GameCatalog.CHESS -> ChessOptionsEditor(
@@ -204,7 +209,7 @@ private fun offlineConfig(
             seat = seat,
             name = if (seat == localSeat) playerName else "Computer $seat",
             kind = if (seat == localSeat) PlayerKind.HUMAN_LOCAL else PlayerKind.AI,
-            team = teamForSeat(gameId, seat),
+            team = teamForSeat(gameId, seat, seatCount),
         )
     },
     optionsJson = optionsJson,
@@ -236,6 +241,9 @@ fun seatCountFor(gameId: String, optionsJson: String): Int {
             GameCatalog.CRAZY_EIGHTS ->
                 setupJson.decodeFromString<CrazyEightsOptions>(optionsJson).playerCount
 
+            GameCatalog.CRIBBAGE ->
+                setupJson.decodeFromString<CribbageOptions>(optionsJson).playerCount
+
             GameCatalog.WIZARD ->
                 setupJson.decodeFromString<WizardOptions>(optionsJson).playerCount
 
@@ -250,11 +258,20 @@ fun seatCountFor(gameId: String, optionsJson: String): Int {
     }.getOrDefault(fallback)
 }
 
-fun teamForSeat(gameId: String, seat: Int): Int = when (gameId) {
+/**
+ * Which side a seat is on.
+ *
+ * [seatCount] is here for the games that are only a partnership game at some
+ * table sizes: cribbage seats two, three or four, and only the four-handed game
+ * is played in pairs — reading `seat % 2` at a table of three would put the
+ * first and third players on the same side, which is not a game anybody plays.
+ */
+fun teamForSeat(gameId: String, seat: Int, seatCount: Int): Int = when (gameId) {
     // Partners sit opposite each other. In Ta Yü that is also which pair of
     // edges you are running your rivers to: even seats north and south, odd
     // seats east and west.
     GameCatalog.EUCHRE, GameCatalog.KAISER, GameCatalog.SEQUENCE, GameCatalog.TAYU -> seat % 2
+    GameCatalog.CRIBBAGE -> if (seatCount == 4) seat % 2 else seat
     // Everyone else plays for themselves.
     else -> seat
 }
@@ -497,6 +514,50 @@ private fun CrazyEightsOptionsEditor(
         Text(
             text = "Standard is seven cards heads-up and five otherwise. Eights are wild " +
                 "and cost fifty if you are caught holding one.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun CribbageOptionsEditor(options: CribbageOptions, onChange: (CribbageOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Players",
+            values = listOf(2, 3, 4),
+            selected = options.playerCount,
+            display = { count ->
+                when (count) {
+                    2 -> "2, head to head"
+                    3 -> "3, every hand for itself"
+                    else -> "4, in partnerships"
+                }
+            },
+            onSelect = { onChange(options.copy(playerCount = it)) },
+        )
+        ChipRow(
+            label = "Game to",
+            values = listOf(61, 121),
+            selected = options.pointsToWin,
+            display = { if (it == 61) "61, once round" else "121, twice round" },
+            onSelect = { onChange(options.copy(pointsToWin = it)) },
+        )
+        ToggleRow(
+            title = "Call the skunk",
+            subtitle = "Say so at the finish when the loser never got off the second street",
+            checked = options.countSkunks,
+            onChange = { onChange(options.copy(countSkunks = it)) },
+        )
+        val shortCrib = if (options.playerCount == 3) {
+            ", with a fourth dealt straight into it"
+        } else {
+            ""
+        }
+        Text(
+            text = "${options.dealSize} cards each, and everyone lays " +
+                "${options.layAwaySize} away to the dealer's crib$shortCrib. Hands are " +
+                "counted from the dealer's left, so a game can be won before the " +
+                "dealer counts at all.",
             style = MaterialTheme.typography.bodySmall,
         )
     }

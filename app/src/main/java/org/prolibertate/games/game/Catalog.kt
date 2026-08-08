@@ -33,6 +33,7 @@ object GameCatalog {
     const val GOLF = "golf"
     const val WIZARD = "wizard"
     const val CRAZY_EIGHTS = "crazy8s"
+    const val CRIBBAGE = "cribbage"
     const val SEQUENCE = "sequence"
     const val MASTERMIND = "mastermind"
     const val BACKGAMMON = "backgammon"
@@ -101,6 +102,18 @@ object GameCatalog {
             maxPlayers = 6,
             teamBased = false,
             blurb = "Match rank or suit, and eights change everything.",
+            available = true,
+        ),
+        GameDescriptor(
+            id = CRIBBAGE,
+            title = "Cribbage",
+            category = GameCategory.CARD,
+            minPlayers = 2,
+            maxPlayers = 4,
+            // Only at four, where the two pairs share a board between them.
+            teamBased = true,
+            blurb = "Fifteen two, fifteen four, and one for his nob. Peg your way " +
+                "twice round the board to 121.",
             available = true,
         ),
         GameDescriptor(

@@ -53,7 +53,7 @@ fun LobbyScreen(
                 optionsJson = route.optionsJson,
                 hostName = playerName,
                 seatCount = seatCount,
-                teamOf = { seat -> teamForSeat(route.gameId, seat) },
+                teamOf = { seat -> teamForSeat(route.gameId, seat, seatCount) },
             )
         } else {
             env.lobby.startDiscovery()
