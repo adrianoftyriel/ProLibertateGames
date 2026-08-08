@@ -128,20 +128,37 @@ class SolitaireRulesTest {
     }
 
     @Test
-    fun `a card in a cell can come back out`() {
+    fun `parking a card takes it off the column and into the cell`() {
         val state = FreeCellRules.initialState(
             soloConfig("freecell", json.encodeToString(FreeCellOptions())),
         )
         val toCell = FreeCellRules.legalMoves(state, 0)
             .filterIsInstance<MoveTo>()
             .first { it.to.kind == org.prolibertate.games.game.freecell.CellKind.CELL }
+        val column = toCell.from.index
+        val card = state.tableau[column].last()
+
         val parked = FreeCellRules.applyMove(state, 0, toCell)
         assertEquals(3, parked.freeCellCount)
+        assertEquals(card, parked.cells[toCell.to.index])
+        assertEquals(state.tableau[column].size - 1, parked.tableau[column].size)
+        // Deliberately not asserting the card can come back out. A parked card
+        // that nothing will take is stranded, and that is the whole danger of
+        // the cells rather than a fault in them.
+    }
+
+    @Test
+    fun `an ace in a cell can always go home`() {
+        val base = FreeCellRules.initialState(
+            soloConfig("freecell", json.encodeToString(FreeCellOptions())),
+        )
+        val ace = c(Rank.ACE, Suit.SPADES)
+        val held = base.copy(cells = listOf(ace, null, null, null))
         assertTrue(
-            "the parked card must be playable again",
-            FreeCellRules.legalMoves(parked, 0)
-                .filterIsInstance<MoveTo>()
-                .any { it.from == Place.cell(toCell.to.index) },
+            "an ace is the one card a cell can never strand",
+            FreeCellRules.legalMoves(held, 0).contains(
+                MoveTo(Place.cell(0), Place.foundation(Suit.SPADES.ordinal), 1),
+            ),
         )
     }
 
