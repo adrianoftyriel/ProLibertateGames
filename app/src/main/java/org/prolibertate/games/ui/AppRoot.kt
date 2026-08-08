@@ -297,14 +297,12 @@ private fun GameTile(game: GameDescriptor, onClick: () -> Unit) {
                 modifier = Modifier.padding(top = 4.dp),
             )
             Text(
-                text = if (game.available) {
-                    if (game.minPlayers == game.maxPlayers) {
-                        "${game.minPlayers} players"
-                    } else {
-                        "${game.minPlayers}–${game.maxPlayers} players"
-                    }
-                } else {
-                    "Coming soon"
+                text = when {
+                    !game.available -> "Coming soon"
+                    // A puzzle for one, rather than "1 players".
+                    game.maxPlayers == 1 -> "On your own"
+                    game.minPlayers == game.maxPlayers -> "${game.minPlayers} players"
+                    else -> "${game.minPlayers}–${game.maxPlayers} players"
                 },
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(top = 8.dp),

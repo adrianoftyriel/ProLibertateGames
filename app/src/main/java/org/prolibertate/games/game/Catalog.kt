@@ -34,6 +34,14 @@ object GameCatalog {
     const val WIZARD = "wizard"
     const val CRAZY_EIGHTS = "crazy8s"
     const val CRIBBAGE = "cribbage"
+
+    /**
+     * Hearts has a rules engine and an AI but no screen yet, so it is an id
+     * without a [GameDescriptor]: nothing to tap, and nothing to crash. It joins
+     * [all] when its screen lands.
+     */
+    const val HEARTS = "hearts"
+    const val PEG_SOLITAIRE = "pegsolitaire"
     const val SEQUENCE = "sequence"
     const val MASTERMIND = "mastermind"
     const val BACKGAMMON = "backgammon"
@@ -117,6 +125,17 @@ object GameCatalog {
             available = true,
         ),
         GameDescriptor(
+            id = HEARTS,
+            title = "Hearts",
+            category = GameCategory.CARD,
+            minPlayers = 4,
+            maxPlayers = 4,
+            teamBased = false,
+            blurb = "Take no trick worth taking. Every heart costs a point, the queen " +
+                "of spades costs thirteen, and taking all of them costs everybody else.",
+            available = true,
+        ),
+        GameDescriptor(
             id = SEQUENCE,
             title = "Sequence",
             category = GameCategory.BOARD,
@@ -175,6 +194,19 @@ object GameCatalog {
             maxPlayers = 2,
             teamBased = false,
             blurb = "Three in a row takes a piece. Reduce them to two and the game is yours.",
+            available = true,
+        ),
+        GameDescriptor(
+            id = PEG_SOLITAIRE,
+            title = "Peg Solitaire",
+            category = GameCategory.BOARD,
+            // The first game here played alone. Everything downstream reads the
+            // seat count from these two numbers, so one seat is all it takes.
+            minPlayers = 1,
+            maxPlayers = 1,
+            teamBased = false,
+            blurb = "The tee game from the table, and four larger boards. Jump a peg, " +
+                "take the one you passed, and try to finish with one standing.",
             available = true,
         ),
         GameDescriptor(

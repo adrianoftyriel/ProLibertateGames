@@ -40,6 +40,10 @@ import org.prolibertate.games.game.crazyeights.CrazyEightsOptions
 import org.prolibertate.games.game.cribbage.CribbageOptions
 import org.prolibertate.games.game.euchre.EuchreOptions
 import org.prolibertate.games.game.golf.GolfOptions
+import org.prolibertate.games.game.hearts.HeartsOptions
+import org.prolibertate.games.game.pegsolitaire.PegBoard
+import org.prolibertate.games.game.pegsolitaire.PegGoal
+import org.prolibertate.games.game.pegsolitaire.PegSolitaireOptions
 import org.prolibertate.games.game.kaiser.KaiserOptions
 import org.prolibertate.games.game.mastermind.MastermindLevel
 import org.prolibertate.games.game.mastermind.MastermindOptions
@@ -88,6 +92,8 @@ fun GameSetupScreen(
     var backgammon by remember { mutableStateOf(BackgammonOptions()) }
     var mastermind by remember { mutableStateOf(MastermindOptions()) }
     var pirates by remember { mutableStateOf(PiratesOptions()) }
+    var hearts by remember { mutableStateOf(HeartsOptions()) }
+    var pegs by remember { mutableStateOf(PegSolitaireOptions()) }
     // Not an engine option: which seat the local player takes. Seat 0 is
     // always White, so choosing Black means sitting in seat 1.
     var playWhite by remember { mutableStateOf(true) }
@@ -111,6 +117,8 @@ fun GameSetupScreen(
         GameCatalog.BACKGAMMON -> setupJson.encodeToString(backgammon)
         GameCatalog.MASTERMIND -> setupJson.encodeToString(mastermind)
         GameCatalog.PIRATES -> setupJson.encodeToString(pirates)
+        GameCatalog.HEARTS -> setupJson.encodeToString(hearts)
+        GameCatalog.PEG_SOLITAIRE -> setupJson.encodeToString(pegs)
         else -> "{}"
     }
     val seatCount = seatCountFor(descriptor.id, optionsJson)
@@ -162,15 +170,27 @@ fun GameSetupScreen(
                     onSide = { playPirates = it },
                 )
 
+                GameCatalog.HEARTS -> HeartsOptionsEditor(hearts) { hearts = it }
+
+                GameCatalog.PEG_SOLITAIRE -> PegSolitaireOptionsEditor(pegs) { pegs = it }
+
                 else -> Text("No options yet for this game.")
             }
 
             Divider()
-            Text("Opponents", fontWeight = FontWeight.Bold)
+            // A one-seat game has nobody to play against and no seat anyone
+            // could join, so it is offered as itself rather than as a table
+            // with every other chair filled by the computer.
+            val solo = seatCount == 1
+            Text(if (solo) "On your own" else "Opponents", fontWeight = FontWeight.Bold)
             Text(
-                text = "Play now and every other seat is taken by the computer. Host a game " +
-                    "instead and people can claim those seats as they join — whatever is " +
-                    "still empty when you start stays computer-controlled.",
+                text = if (solo) {
+                    "A puzzle for one. There is nobody to wait for and nothing to host."
+                } else {
+                    "Play now and every other seat is taken by the computer. Host a game " +
+                        "instead and people can claim those seats as they join — whatever is " +
+                        "still empty when you start stays computer-controlled."
+                },
                 style = MaterialTheme.typography.bodySmall,
             )
 
@@ -182,14 +202,16 @@ fun GameSetupScreen(
                 descriptor.id == GameCatalog.PIRATES && playPirates -> 1
                 else -> 0
             }
-            PrimaryAction(text = "Play against the computer") {
+            PrimaryAction(text = if (solo) "Play" else "Play against the computer") {
                 onPlayOffline(
                     offlineConfig(descriptor.id, optionsJson, seatCount, playerName, localSeat),
                     localSeat,
                 )
             }
-            PrimaryAction(text = "Host a game for others to join") {
-                onHostOnline(optionsJson)
+            if (!solo) {
+                PrimaryAction(text = "Host a game for others to join") {
+                    onHostOnline(optionsJson)
+                }
             }
         }
     }
@@ -942,5 +964,51 @@ private fun ToggleRow(
             Text(subtitle, style = MaterialTheme.typography.bodySmall)
         }
         Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
+private fun HeartsOptionsEditor(options: HeartsOptions, onChange: (HeartsOptions) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Game ends at",
+            values = listOf(50, 100),
+            selected = options.targetScore,
+            display = { "$it points" },
+            onSelect = { onChange(options.copy(targetScore = it)) },
+        )
+        ToggleRow(
+            title = "Shooting the moon",
+            subtitle = "Take all twenty-six and score nothing, while everyone else takes " +
+                "the lot. Switched off, a moon is simply the worst hand at the table.",
+            checked = options.allowShootTheMoon,
+            onChange = { onChange(options.copy(allowShootTheMoon = it)) },
+        )
+    }
+}
+
+@Composable
+private fun PegSolitaireOptionsEditor(
+    options: PegSolitaireOptions,
+    onChange: (PegSolitaireOptions) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(
+            label = "Board",
+            values = PegBoard.entries.toList(),
+            selected = options.board,
+            display = { it.label },
+            // The opening hole is cleared as well: a hole that exists on the old
+            // board may be a missing corner on the new one, and the options
+            // refuse to be built that way.
+            onSelect = { onChange(options.copy(board = it, startEmpty = null)) },
+        )
+        ChipRow(
+            label = "Finish",
+            values = PegGoal.entries.toList(),
+            selected = options.goal,
+            display = { it.label },
+            onSelect = { onChange(options.copy(goal = it)) },
+        )
     }
 }
