@@ -35,19 +35,9 @@ object GameCatalog {
     const val CRAZY_EIGHTS = "crazy8s"
     const val CRIBBAGE = "cribbage"
 
-    /**
-     * Hearts has a rules engine and an AI but no screen yet, so it is an id
-     * without a [GameDescriptor]: nothing to tap, and nothing to crash. It joins
-     * [all] when its screen lands.
-     */
     const val HEARTS = "hearts"
     const val PEG_SOLITAIRE = "pegsolitaire"
 
-    /**
-     * An id ahead of its screen: the engine is written and tested, but a
-     * catalogue entry with nothing behind it would crash on the first tap, so it
-     * joins [all] when its screen lands.
-     */
     const val YAHTZEE = "yahtzee"
     const val KLONDIKE = "klondike"
     const val SEQUENCE = "sequence"
@@ -144,6 +134,17 @@ object GameCatalog {
             available = true,
         ),
         GameDescriptor(
+            id = KLONDIKE,
+            title = "Klondike",
+            category = GameCategory.CARD,
+            minPlayers = 1,
+            maxPlayers = 1,
+            teamBased = false,
+            blurb = "Patience, as everyone means it. Seven columns down to the aces, " +
+                "and a pack that decides most of it before you start.",
+            available = true,
+        ),
+        GameDescriptor(
             id = SEQUENCE,
             title = "Sequence",
             category = GameCategory.BOARD,
@@ -215,6 +216,17 @@ object GameCatalog {
             teamBased = false,
             blurb = "The tee game from the table, and four larger boards. Jump a peg, " +
                 "take the one you passed, and try to finish with one standing.",
+            available = true,
+        ),
+        GameDescriptor(
+            id = YAHTZEE,
+            title = "Yahtzee",
+            category = GameCategory.BOARD,
+            minPlayers = 1,
+            maxPlayers = 6,
+            teamBased = false,
+            blurb = "Five dice, three throws, thirteen boxes to fill. Every box can be " +
+                "written in once, so the hard part is what to give up on.",
             available = true,
         ),
         GameDescriptor(
