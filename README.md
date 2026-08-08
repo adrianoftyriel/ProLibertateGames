@@ -17,8 +17,8 @@ machinery for it is still there and still tested: a game listed in `GameCatalog`
 with `available = false` appears in the menu marked *Coming soon* **on dev builds
 only**, so a production release lists just what can actually be played and nobody
 installs it and taps into a dead end. The menu decides this from the installed
-APK's own version name, so it follows the build rather than the channel selected
-for future updates.
+APK's own version name — the same source the updater uses to know which channel
+it is on.
 
 Adding a game means writing a `GameRules` implementation, a `GameAi` and a
 screen, then flipping `available` — the menu, lobby, networking, settings and OTA
@@ -91,13 +91,14 @@ it: every rule above is a pure function and unit-tested on the JVM.
 - **Sound** on/off.
 - **Animation speed**, 0.5×–2×. One multiplier drives card movement and how long
   the computer appears to think.
-- **Updates** — check on launch, or check on demand, from either of two
-  channels:
-  - **Production** — stable builds, published from `main`.
-  - **Dev** — preview builds, published from `dev` on every green CI run.
+- **Updates** — check on launch, or check on demand. **There is no channel to
+  choose**: a build updates from its own channel and no other. A production
+  install is offered production builds from `main`; a dev install is offered dev
+  builds from `dev`. The settings screen states which one is running rather than
+  offering a switch.
 
-  The two install as separate apps, so both can be kept on one device — see
-  [Both channels on one device](#both-channels-on-one-device).
+  Wanting both means installing both — they are separate apps and each updates
+  itself, see [Both channels on one device](#both-channels-on-one-device).
 
 ## Branding
 
@@ -184,8 +185,9 @@ the versioned copy, so an installed build can always be traced back to its tag.
 
 There is no equivalent link for the dev channel: `/releases/latest` skips
 prereleases by design, and that is exactly what keeps a production install from
-being handed a dev build. Dev builds are reached through the in-app updater with
-the channel set to dev, or from the releases page.
+being handed a dev build. A dev build is reached by the in-app updater of a dev
+install — which looks at the prerelease list rather than that endpoint — or from
+the releases page.
 
 ### The version series
 
@@ -239,9 +241,16 @@ aimed elsewhere does nothing rather than shipping unreviewed code.
 
 **The two channels have independent version sequences** — a build's `versionCode`
 is the run number of the workflow that produced it, and the two workflows count
-separately. Versions are therefore only ever compared *within* a channel; the app
-reads the `-dev` suffix in its own `versionName` to know which channel it is on,
-and treats a change of channel as an explicit switch rather than an upgrade.
+separately. Dev is on 69 while production is on 40, so the numbers say nothing
+across the divide.
+
+That is why **an install only ever updates within its own channel**, and why
+there is no setting for it. The app reads the `-dev` suffix in its own
+`versionName` to know which line it is on, asks only that channel, and refuses
+anything that comes back belonging to the other one — checked again at the point
+of decision rather than trusted from the fetch. The rule is a pure function,
+`verdictFor` in `update/UpdatePolicy.kt`, with no Android in it, so it is
+unit-tested on the JVM like the rules engines are.
 
 ### Both channels on one device
 
@@ -272,9 +281,10 @@ reference `@color/tartan_field` rather than a literal, which is how one set of
 vectors serves both colourways. `BuildConfig.DEV_BUILD` carries the same flag
 into Kotlin, where `AppSett` picks the matching Compose sett for the splash.
 
-Switching channels in Settings therefore installs the other channel's app
-alongside this one and leaves this one in place; the settings screen says so
-when the selected channel is not the installed one.
+Because they are separate apps, having both is a matter of installing both, and
+each then updates itself down its own line. Nothing in the app moves a phone
+from one channel to the other: the settings screen states which build is
+running and where its updates come from, and that is all it does.
 
 The debug keystore is committed on purpose: every build is signed with the same
 key, so an OTA update installs over the previous one instead of being rejected
@@ -331,7 +341,7 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
 net/           wire protocol, LAN transport, lobby, match driver
 score/         scorekeeper sheet — pure Kotlin, unit-tested — and its store
 settings/      DataStore-backed preferences
-update/        GitHub Releases OTA updater
+update/        GitHub Releases OTA updater, and the channel rule — pure, tested
 ui/            Compose screens
 ```
 
