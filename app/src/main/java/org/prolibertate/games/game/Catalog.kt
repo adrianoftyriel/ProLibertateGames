@@ -40,6 +40,9 @@ object GameCatalog {
 
     const val YAHTZEE = "yahtzee"
     const val KLONDIKE = "klondike"
+    const val FREECELL = "freecell"
+    const val SPIDER = "spider"
+    const val PYRAMID = "pyramid"
     const val SEQUENCE = "sequence"
     const val MASTERMIND = "mastermind"
     const val BACKGAMMON = "backgammon"
@@ -142,6 +145,39 @@ object GameCatalog {
             teamBased = false,
             blurb = "Patience, as everyone means it. Seven columns down to the aces, " +
                 "and a pack that decides most of it before you start.",
+            available = true,
+        ),
+        GameDescriptor(
+            id = FREECELL,
+            title = "FreeCell",
+            category = GameCategory.CARD,
+            minPlayers = 1,
+            maxPlayers = 1,
+            teamBased = false,
+            blurb = "Every card face up from the start, and four cells to park what is " +
+                "in the way. Nearly every deal can be won by someone good enough.",
+            available = true,
+        ),
+        GameDescriptor(
+            id = SPIDER,
+            title = "Spider",
+            category = GameCategory.CARD,
+            minPlayers = 1,
+            maxPlayers = 1,
+            teamBased = false,
+            blurb = "Two packs, ten columns, eight runs to build from king to ace. " +
+                "One suit is a pastime; four is a fight.",
+            available = true,
+        ),
+        GameDescriptor(
+            id = PYRAMID,
+            title = "Pyramid",
+            category = GameCategory.CARD,
+            minPlayers = 1,
+            maxPlayers = 1,
+            teamBased = false,
+            blurb = "Take cards away in pairs that make thirteen, kings alone. " +
+                "Nothing is built and nothing goes home — the pyramid just has to go.",
             available = true,
         ),
         GameDescriptor(
