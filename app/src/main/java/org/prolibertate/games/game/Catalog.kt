@@ -1,22 +1,39 @@
 package org.prolibertate.games.game
 
 /**
- * The catalogue the main menu is built from.
+ * The menus the main screen is built from.
  *
- * Every game the app intends to ship appears here, whether or not its rules
- * engine exists yet. [GameDescriptor.available] is what the menu keys off to
- * decide between "play" and "coming soon", so adding a game is a matter of
- * flipping that flag once its engine and screen land.
+ * A tree rather than a list, because "trick-taking" is a kind of card game
+ * rather than a rival to it. [parent] is read from a `when` rather than passed
+ * to the constructor: an enum entry cannot refer to another entry while the
+ * class is still initialising, and a lookup afterwards is free.
  */
-enum class GameCategory(val label: String) {
-    CARD("Playing Card Games"),
-    BOARD("Board Games"),
+enum class GameMenu(val label: String, val blurb: String) {
+    SOLITAIRE("Solitaire", "Played alone, against the deal or the board."),
+    CARDS("Card Games", "Anything played with a pack."),
+    TRICK_TAKING("Trick-taking", "Lead, follow, and count what you took."),
+    BOARD("Board Games", "Boards, pieces and dice."),
+    ;
+
+    val parent: GameMenu? get() = when (this) {
+        TRICK_TAKING -> CARDS
+        else -> null
+    }
+
+    val children: List<GameMenu> get() = entries.filter { it.parent == this }
+
+    val isTopLevel: Boolean get() = parent == null
 }
 
 data class GameDescriptor(
     val id: String,
     val title: String,
-    val category: GameCategory,
+    /**
+     * Every menu this game appears under. A patience is both solitaire and a
+     * card game, and Euchre is both a card game and a trick-taking one — so
+     * this is a set, and the same game is listed in each place it belongs.
+     */
+    val menus: Set<GameMenu>,
     val minPlayers: Int,
     val maxPlayers: Int,
     /** True when players are grouped into partnerships rather than playing solo. */
@@ -25,6 +42,14 @@ data class GameDescriptor(
     val available: Boolean,
 )
 
+/**
+ * The catalogue the menus are built from.
+ *
+ * Every game the app intends to ship appears here, whether or not its rules
+ * engine exists yet. [GameDescriptor.available] is what the menu keys off to
+ * decide between "play" and "coming soon", so adding a game is a matter of
+ * flipping that flag once its engine and screen land.
+ */
 object GameCatalog {
 
     const val EUCHRE = "euchre"
@@ -56,7 +81,7 @@ object GameCatalog {
         GameDescriptor(
             id = EUCHRE,
             title = "Euchre",
-            category = GameCategory.CARD,
+            menus = setOf(GameMenu.CARDS, GameMenu.TRICK_TAKING),
             minPlayers = 4,
             maxPlayers = 4,
             teamBased = true,
@@ -66,7 +91,7 @@ object GameCatalog {
         GameDescriptor(
             id = KAISER,
             title = "Kaiser",
-            category = GameCategory.CARD,
+            menus = setOf(GameMenu.CARDS, GameMenu.TRICK_TAKING),
             minPlayers = 4,
             maxPlayers = 4,
             teamBased = true,
@@ -76,7 +101,7 @@ object GameCatalog {
         GameDescriptor(
             id = PRESIDENT,
             title = "President",
-            category = GameCategory.CARD,
+            menus = setOf(GameMenu.CARDS),
             minPlayers = 3,
             maxPlayers = 7,
             teamBased = false,
@@ -86,7 +111,7 @@ object GameCatalog {
         GameDescriptor(
             id = GOLF,
             title = "Golf",
-            category = GameCategory.CARD,
+            menus = setOf(GameMenu.CARDS),
             minPlayers = 2,
             maxPlayers = 6,
             teamBased = false,
@@ -96,7 +121,7 @@ object GameCatalog {
         GameDescriptor(
             id = WIZARD,
             title = "Wizard",
-            category = GameCategory.CARD,
+            menus = setOf(GameMenu.CARDS, GameMenu.TRICK_TAKING),
             minPlayers = 3,
             maxPlayers = 6,
             teamBased = false,
@@ -106,7 +131,7 @@ object GameCatalog {
         GameDescriptor(
             id = CRAZY_EIGHTS,
             title = "Crazy 8s",
-            category = GameCategory.CARD,
+            menus = setOf(GameMenu.CARDS),
             minPlayers = 2,
             maxPlayers = 6,
             teamBased = false,
@@ -116,7 +141,7 @@ object GameCatalog {
         GameDescriptor(
             id = CRIBBAGE,
             title = "Cribbage",
-            category = GameCategory.CARD,
+            menus = setOf(GameMenu.CARDS),
             minPlayers = 2,
             maxPlayers = 4,
             // Only at four, where the two pairs share a board between them.
@@ -128,7 +153,7 @@ object GameCatalog {
         GameDescriptor(
             id = HEARTS,
             title = "Hearts",
-            category = GameCategory.CARD,
+            menus = setOf(GameMenu.CARDS, GameMenu.TRICK_TAKING),
             minPlayers = 4,
             maxPlayers = 4,
             teamBased = false,
@@ -139,7 +164,7 @@ object GameCatalog {
         GameDescriptor(
             id = KLONDIKE,
             title = "Klondike",
-            category = GameCategory.CARD,
+            menus = setOf(GameMenu.SOLITAIRE, GameMenu.CARDS),
             minPlayers = 1,
             maxPlayers = 1,
             teamBased = false,
@@ -150,7 +175,7 @@ object GameCatalog {
         GameDescriptor(
             id = FREECELL,
             title = "FreeCell",
-            category = GameCategory.CARD,
+            menus = setOf(GameMenu.SOLITAIRE, GameMenu.CARDS),
             minPlayers = 1,
             maxPlayers = 1,
             teamBased = false,
@@ -161,7 +186,7 @@ object GameCatalog {
         GameDescriptor(
             id = SPIDER,
             title = "Spider",
-            category = GameCategory.CARD,
+            menus = setOf(GameMenu.SOLITAIRE, GameMenu.CARDS),
             minPlayers = 1,
             maxPlayers = 1,
             teamBased = false,
@@ -172,7 +197,7 @@ object GameCatalog {
         GameDescriptor(
             id = PYRAMID,
             title = "Pyramid",
-            category = GameCategory.CARD,
+            menus = setOf(GameMenu.SOLITAIRE, GameMenu.CARDS),
             minPlayers = 1,
             maxPlayers = 1,
             teamBased = false,
@@ -183,7 +208,7 @@ object GameCatalog {
         GameDescriptor(
             id = SEQUENCE,
             title = "Sequence",
-            category = GameCategory.BOARD,
+            menus = setOf(GameMenu.BOARD, GameMenu.CARDS),
             minPlayers = 2,
             maxPlayers = 12,
             teamBased = true,
@@ -193,7 +218,7 @@ object GameCatalog {
         GameDescriptor(
             id = MASTERMIND,
             title = "Mastermind",
-            category = GameCategory.BOARD,
+            menus = setOf(GameMenu.BOARD),
             minPlayers = 2,
             maxPlayers = 2,
             teamBased = false,
@@ -204,7 +229,7 @@ object GameCatalog {
         GameDescriptor(
             id = BACKGAMMON,
             title = "Backgammon",
-            category = GameCategory.BOARD,
+            menus = setOf(GameMenu.BOARD),
             minPlayers = 2,
             maxPlayers = 2,
             teamBased = false,
@@ -214,7 +239,7 @@ object GameCatalog {
         GameDescriptor(
             id = CHESS,
             title = "Chess",
-            category = GameCategory.BOARD,
+            menus = setOf(GameMenu.BOARD),
             minPlayers = 2,
             maxPlayers = 2,
             teamBased = false,
@@ -224,7 +249,7 @@ object GameCatalog {
         GameDescriptor(
             id = CHECKERS,
             title = "Checkers",
-            category = GameCategory.BOARD,
+            menus = setOf(GameMenu.BOARD),
             minPlayers = 2,
             maxPlayers = 2,
             teamBased = false,
@@ -234,7 +259,7 @@ object GameCatalog {
         GameDescriptor(
             id = MORRIS,
             title = "Nine Men's Morris",
-            category = GameCategory.BOARD,
+            menus = setOf(GameMenu.BOARD),
             minPlayers = 2,
             maxPlayers = 2,
             teamBased = false,
@@ -244,7 +269,7 @@ object GameCatalog {
         GameDescriptor(
             id = PEG_SOLITAIRE,
             title = "Peg Solitaire",
-            category = GameCategory.BOARD,
+            menus = setOf(GameMenu.SOLITAIRE, GameMenu.BOARD),
             // The first game here played alone. Everything downstream reads the
             // seat count from these two numbers, so one seat is all it takes.
             minPlayers = 1,
@@ -257,7 +282,7 @@ object GameCatalog {
         GameDescriptor(
             id = YAHTZEE,
             title = "Yahtzee",
-            category = GameCategory.BOARD,
+            menus = setOf(GameMenu.BOARD),
             minPlayers = 1,
             maxPlayers = 6,
             teamBased = false,
@@ -268,7 +293,7 @@ object GameCatalog {
         GameDescriptor(
             id = PIRATES,
             title = "Pirates and Bulgars",
-            category = GameCategory.BOARD,
+            menus = setOf(GameMenu.BOARD),
             minPlayers = 2,
             maxPlayers = 2,
             teamBased = false,
@@ -279,7 +304,7 @@ object GameCatalog {
         GameDescriptor(
             id = TAYU,
             title = "Ta Yü",
-            category = GameCategory.BOARD,
+            menus = setOf(GameMenu.BOARD),
             minPlayers = 2,
             maxPlayers = 4,
             // Two play solo, four play in partnerships across the two axes.
@@ -301,13 +326,24 @@ object GameCatalog {
      * production build lists only what can actually be played, so nobody
      * downloads a release and taps into a dead end.
      */
-    fun byCategory(
-        category: GameCategory,
+    fun inMenu(
+        menu: GameMenu,
         includeComingSoon: Boolean = true,
     ): List<GameDescriptor> = all.filter {
-        it.category == category && (includeComingSoon || it.available)
+        it.menus.contains(menu) && (includeComingSoon || it.available)
     }
 
-    /** Everything currently playable, regardless of category. */
+    /**
+     * Whether a menu is worth showing at all.
+     *
+     * A section with nothing in it and no populated child under it is a heading
+     * over an empty room, which is what a production build would get if every
+     * game in a menu were still unfinished.
+     */
+    fun hasAnything(menu: GameMenu, includeComingSoon: Boolean = true): Boolean =
+        inMenu(menu, includeComingSoon).isNotEmpty() ||
+            menu.children.any { inMenu(it, includeComingSoon).isNotEmpty() }
+
+    /** Everything currently playable, whatever menu it is under. */
     val playable: List<GameDescriptor> get() = all.filter { it.available }
 }
