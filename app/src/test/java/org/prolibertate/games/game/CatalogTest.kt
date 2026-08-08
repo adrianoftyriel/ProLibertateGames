@@ -71,6 +71,8 @@ class CatalogTest {
                 GameCatalog.KAISER,
                 GameCatalog.CRAZY_EIGHTS,
                 GameCatalog.CRIBBAGE,
+                GameCatalog.HEARTS,
+                GameCatalog.PEG_SOLITAIRE,
                 GameCatalog.WIZARD,
                 GameCatalog.CHESS,
                 GameCatalog.TAYU,
@@ -87,7 +89,11 @@ class CatalogTest {
     @Test
     fun `player counts are sane`() {
         GameCatalog.all.forEach { game ->
-            assertTrue("${game.id} min players", game.minPlayers >= 2)
+            // One, not two. Peg solitaire is played alone, and the engine took
+            // that without changes — one seat, always on the clock, nothing to
+            // redact. Everything downstream reads the seat count from here, so
+            // this is the only place that had to allow it.
+            assertTrue("${game.id} min players", game.minPlayers >= 1)
             assertTrue("${game.id} max >= min", game.maxPlayers >= game.minPlayers)
         }
     }
