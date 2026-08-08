@@ -2,14 +2,15 @@ package org.prolibertate.games.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -214,7 +215,7 @@ private fun AppContent(
 // Main menu
 // ---------------------------------------------------------------------------
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainMenuScreen(
     showComingSoon: Boolean,
@@ -233,45 +234,52 @@ fun MainMenuScreen(
             )
         }
     ) { padding ->
-        Column(
+        // Only the top of the tree. Trick-taking is reached through Card Games,
+        // which is where somebody looking for it would go.
+        val sections = GameMenu.entries.filter {
+            it.isTopLevel && GameCatalog.hasAnything(it, includeComingSoon = showComingSoon)
+        }
+
+        // One column, held in the middle. There are only ever a handful of
+        // entries here now that the games themselves live a level down, and a
+        // short list spread across a grid reads as a page half empty rather
+        // than as a menu. Capped in width so it does not become a row of very
+        // wide buttons on a tablet.
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            // Wraps rather than running off the edge: two buttons and a narrow
-            // phone would otherwise push the second one past the screen.
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                OutlinedButton(onClick = onJoinGame) { Text("Join a game nearby") }
-                // Not a game, and deliberately not in the catalogue: it keeps
-                // score for whatever is being played on the actual table.
-                OutlinedButton(onClick = onScorekeeper) { Text("Scorekeeper") }
-            }
-
-            // The column count follows the available width, so a phone in
-            // portrait gets two and a tablet in landscape gets four or more.
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 172.dp),
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 340.dp)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // Only the top of the tree. Trick-taking is reached through
-                // Card Games, which is where somebody looking for it would go.
-                val sections = GameMenu.entries.filter {
-                    it.isTopLevel && GameCatalog.hasAnything(it, includeComingSoon = showComingSoon)
-                }
-                items(sections) { section ->
+                sections.forEach { section ->
                     SectionTile(
                         menu = section,
                         count = countIn(section, showComingSoon),
                         onClick = { onPickSection(section) },
                     )
                 }
+
+                // Below the games, and full width like them, so the column
+                // stays one column all the way down.
+                OutlinedButton(
+                    onClick = onJoinGame,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                ) { Text("Join a game nearby") }
+                // Not a game, and deliberately not in the catalogue: it keeps
+                // score for whatever is being played on the actual table.
+                OutlinedButton(
+                    onClick = onScorekeeper,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Scorekeeper") }
             }
         }
     }
