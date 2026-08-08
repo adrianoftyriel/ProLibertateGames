@@ -67,3 +67,48 @@ The suppression is a property of the sandbox's credential, so it cannot be
 fixed from inside a session. Giving the environment a personal access token to
 push with would make pushes and PRs behave normally for everyone. Until then,
 the dispatch step above is the workaround.
+
+## Bash output is filtered before it reaches the model
+
+`.claude/settings.json` registers a `PreToolUse` hook on `Bash` that rewrites
+each command through [rtk](https://github.com/rtk-ai/rtk): `git status` runs as
+`rtk git status`, and rtk compresses the output. Write commands normally — the
+rewrite is transparent and costs nothing to invoke.
+
+Measured on this repo rather than quoted from rtk's README:
+
+| Command | Raw | Filtered | Saved |
+| --- | --- | --- | --- |
+| `git diff HEAD~3` | 521 KB | 28 KB | 95% |
+| `grep -rn "fun " app/src/main` | 117 KB | 19 KB | 84% |
+| `find . -name "*.kt"` | 7.7 KB | 1.7 KB | 79% |
+| `git log -20` | 20 KB | 5.3 KB | 74% |
+| `git diff --stat` | 4.0 KB | 4.0 KB | 1% |
+| `ls` of a single package | 50 B | 62 B | −24% |
+
+The saving is all in the large outputs, which is the point — a full diff of a
+few commits is otherwise most of a context window. Already-compact output grows
+slightly, because rtk adds a header; at those sizes it does not matter. `rtk
+gain` reports what the current session has actually saved.
+
+Two limits are worth knowing. The `Read`, `Grep` and `Glob` tools are not
+`Bash`, so they never reach the hook and are unaffected; a deliberate `rg` or
+`find` in a shell *is* filtered. And filtering never truncates a file: `cat`
+becomes `rtk read`, which was checked byte-for-byte against this repo's longest
+Kotlin source (`GameSetupScreen.kt`, 946 lines) and came back identical. Commit
+messages survive the rewrite intact, quotes and colons included. To bypass
+filtering for one command, run `rtk proxy <cmd>`.
+
+## rtk is reinstalled at the start of every session
+
+The container starts empty, so `.claude/hooks/session-start.sh` installs rtk
+before the session does anything. It pins `RTK_VERSION`, because the installer
+otherwise asks `api.github.com` for the latest tag and the proxy answers 403 for
+every repository except this one — the lookup fails and takes the install with
+it. Bump that variable by hand.
+
+The hook is written not to matter when it fails. Outside the sandbox it installs
+nothing and just prints the command to run, since dropping a binary into
+someone's `~/.local/bin` uninvited is not its business; if the download fails it
+says so and exits clean. With rtk absent the rewrite hook no-ops, and the only
+consequence is verbose output.
