@@ -34,6 +34,13 @@ object GameCatalog {
     const val WIZARD = "wizard"
     const val CRAZY_EIGHTS = "crazy8s"
     const val CRIBBAGE = "cribbage"
+
+    /**
+     * Hearts has a rules engine and an AI but no screen yet, so it is an id
+     * without a [GameDescriptor]: nothing to tap, and nothing to crash. It joins
+     * [all] when its screen lands.
+     */
+    const val HEARTS = "hearts"
     const val SEQUENCE = "sequence"
     const val MASTERMIND = "mastermind"
     const val BACKGAMMON = "backgammon"
