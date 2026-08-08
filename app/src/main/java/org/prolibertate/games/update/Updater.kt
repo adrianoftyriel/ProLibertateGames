@@ -15,77 +15,35 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Which builds the updater offers.
- *
- * The two channels are published by different workflows and so have entirely
- * separate version sequences — a dev build's versionCode is its CI run number,
- * a production build's is its release run number, and the two are unrelated.
- * Versions are therefore only ever compared *within* a channel; moving between
- * them is treated as an explicit switch rather than an upgrade.
- *
- * The two also carry different applicationIds — a dev build installs as
- * `…games.dev` — so a switch installs the other channel beside this one instead
- * of over it, and both can be kept on the same device.
- */
-enum class UpdateChannel(val label: String, val blurb: String) {
-    PRODUCTION("Production", "Stable builds released from main"),
-    DEV("Dev", "Preview builds from the dev branch — newer, less tested"),
-}
-
-/** Marks a version name as belonging to the dev channel. */
-private const val DEV_SUFFIX = "-dev"
-
-/**
  * Over-the-air updates from the repository's GitHub Releases.
  *
  * Release tags are v<series>.<run-number> and the APK's versionCode is that same run
  * number, so comparing the two is enough to tell whether a newer build exists.
  * The repository's releases must be publicly downloadable — no token is
  * embedded in the app, and GitHub blocks anonymous access to private assets.
+ *
+ * There is nothing to choose here. The channel comes from the running APK, so
+ * a dev install looks only at dev builds and a production install only at
+ * production ones — see [verdictFor], where that rule lives and is tested.
  */
 class Updater(private val activity: Activity) {
 
-    data class Release(
-        val tag: String,
-        val versionCode: Int,
-        val apkUrl: String,
-        val apkName: String,
-        val channel: UpdateChannel,
-    )
-
-    sealed interface Result {
-        /**
-         * [isChannelSwitch] means this build is from a different channel than
-         * the one installed, so it is an explicit move rather than a newer
-         * version of the same line — and, because the channels have separate
-         * applicationIds, it lands as a second app rather than an upgrade.
-         */
-        data class Available(val release: Release, val isChannelSwitch: Boolean) : Result
-
-        data object UpToDate : Result
-        data class Failed(val reason: String) : Result
-    }
-
-    suspend fun check(channel: UpdateChannel): Result = withContext(Dispatchers.IO) {
+    /**
+     * Looks for a newer build of whatever is installed.
+     *
+     * Takes no channel: asking for one would be asking which line of builds
+     * this phone is on, and the phone already knows.
+     */
+    suspend fun check(): UpdateVerdict = withContext(Dispatchers.IO) {
         try {
-            val latest = fetchLatestRelease(channel)
-                ?: return@withContext Result.Failed(
-                    "No ${channel.label.lowercase()} build has been published yet."
-                )
-
-            when {
-                // Different channel: version numbers are not comparable, so
-                // always offer it and let the user decide.
-                latest.channel != installedChannel() ->
-                    Result.Available(latest, isChannelSwitch = true)
-
-                latest.versionCode > installedVersionCode() ->
-                    Result.Available(latest, isChannelSwitch = false)
-
-                else -> Result.UpToDate
-            }
+            val channel = installedChannel()
+            verdictFor(
+                latest = fetchLatestRelease(channel),
+                installedChannel = channel,
+                installedVersionCode = installedVersionCode(),
+            )
         } catch (e: Exception) {
-            Result.Failed(e.message ?: "Update check failed.")
+            UpdateVerdict.Refused(e.message ?: "Update check failed.")
         }
     }
 
@@ -112,19 +70,8 @@ class Updater(private val activity: Activity) {
 
     private fun toRelease(json: JSONObject): Release? {
         val tag = json.optString("tag_name").ifBlank { return null }
-        // Tags are v<series>.<n>, with -dev on a prerelease. Only the trailing
-        // run number is read: the series is a name for people and changing it
-        // must not make an older build look newer.
-        val versionCode = tag.substringAfterLast('.')
-            .removeSuffix(DEV_SUFFIX)
-            .toIntOrNull()
-            ?: return null
-        val channel =
-            if (tag.endsWith(DEV_SUFFIX) || json.optBoolean("prerelease")) {
-                UpdateChannel.DEV
-            } else {
-                UpdateChannel.PRODUCTION
-            }
+        val versionCode = versionCodeOfTag(tag) ?: return null
+        val channel = channelOfTag(tag, json.optBoolean("prerelease"))
 
         val assets = json.optJSONArray("assets") ?: return null
         val apks = (0 until assets.length())
@@ -178,9 +125,7 @@ class Updater(private val activity: Activity) {
     }
 
     /** Read back from the installed APK's own version name. */
-    fun installedChannel(): UpdateChannel =
-        if (installedVersionName().endsWith(DEV_SUFFIX)) UpdateChannel.DEV
-        else UpdateChannel.PRODUCTION
+    fun installedChannel(): UpdateChannel = channelOfVersionName(installedVersionName())
 
     /** Downloads the APK and hands it to the system installer. */
     suspend fun downloadAndInstall(release: Release): String? = withContext(Dispatchers.IO) {

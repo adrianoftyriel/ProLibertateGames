@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import org.prolibertate.games.update.UpdateChannel
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -32,8 +31,6 @@ data class Settings(
      * snapped back before a real name could be typed.
      */
     val playerName: String = "",
-    /** Which builds the updater offers. Production unless deliberately changed. */
-    val updateChannel: UpdateChannel = UpdateChannel.PRODUCTION,
 ) {
     /**
      * The name other players actually see. This is where the default lives, so
@@ -60,7 +57,11 @@ class SettingsRepository(private val context: Context) {
         val SPEED = floatPreferencesKey("animation_speed")
         val UPDATE_ON_LAUNCH = booleanPreferencesKey("check_updates_on_launch")
         val NAME = stringPreferencesKey("player_name")
-        val CHANNEL = stringPreferencesKey("update_channel")
+        // There is deliberately no update-channel key. The channel is a
+        // property of the installed APK, not a preference — an install that
+        // could be pointed at the other channel's builds is exactly the mix-up
+        // that separate applicationIds exist to prevent. Anything an older
+        // version left under "update_channel" is simply never read again.
     }
 
     val settings: Flow<Settings> = context.dataStore.data.map { prefs ->
@@ -69,14 +70,7 @@ class SettingsRepository(private val context: Context) {
             animationSpeed = prefs[Keys.SPEED] ?: 1.0f,
             checkForUpdatesOnLaunch = prefs[Keys.UPDATE_ON_LAUNCH] ?: true,
             playerName = prefs[Keys.NAME] ?: "",
-            updateChannel = prefs[Keys.CHANNEL]
-                ?.let { stored -> runCatching { UpdateChannel.valueOf(stored) }.getOrNull() }
-                ?: UpdateChannel.PRODUCTION,
         )
-    }
-
-    suspend fun setUpdateChannel(channel: UpdateChannel) {
-        context.dataStore.edit { it[Keys.CHANNEL] = channel.name }
     }
 
     suspend fun setSoundEnabled(enabled: Boolean) {
