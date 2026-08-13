@@ -98,6 +98,60 @@ class CardPhysicsTest {
         assertNotEquals(cardRest(cardSeed(card, 0)), cardRest(cardSeed(card, 1)))
     }
 
+    /**
+     * A heap is untidier than a card laid in front of a player, and has to be:
+     * at the tight bounds five cards on a discard pile are hidden to within a
+     * twentieth of a card width of each other and the pile looks like one card.
+     */
+    @Test
+    fun `a heap lies looser than a table but still within bounds`() {
+        deck.forEach { card ->
+            val seed = cardSeed(card)
+            val heap = heapRest(seed)
+            val table = cardRest(seed)
+            assertTrue(abs(heap.tiltDegrees) <= HEAP_TILT_DEGREES)
+            assertTrue(abs(heap.driftX) <= HEAP_DRIFT_FRACTION)
+            assertTrue(abs(heap.driftY) <= HEAP_DRIFT_FRACTION)
+            assertTrue(abs(heap.tiltDegrees) >= abs(table.tiltDegrees))
+            assertTrue(abs(heap.driftX) >= abs(table.driftX))
+        }
+    }
+
+    /**
+     * The two have to agree about everything except how far the card strayed,
+     * or a card would jump when it was drawn one way rather than the other.
+     */
+    @Test
+    fun `a heap and a table agree about the throw`() {
+        deck.take(6).forEach { card ->
+            val seed = cardSeed(card)
+            assertEquals(cardRest(seed).spinDegrees, heapRest(seed).spinDegrees, 0f)
+            assertEquals(cardRest(seed).lateness, heapRest(seed).lateness, 0f)
+        }
+    }
+
+    /**
+     * A buried card has to end up near the rim of whatever is covering it. One
+     * left in the middle is one nobody can see, and then drawing the pile as a
+     * pile achieves nothing.
+     */
+    @Test
+    fun `a buried card ends up out where a corner of it shows`() {
+        deck.forEach { card ->
+            val (x, y) = buriedOffset(cardSeed(card), halfWidth = 100f, halfHeight = 40f)
+            val howFarOut = kotlin.math.hypot(x / 100f, y / 40f)
+            assertTrue("$card sat at $howFarOut of the way out", howFarOut >= 0.719f)
+            assertTrue(howFarOut <= 1.001f)
+        }
+    }
+
+    /** Two cards buried under the same set must not end up in the same place. */
+    @Test
+    fun `buried cards do not stack on each other`() {
+        val places = (0 until 6).map { buriedOffset(cardSeed(deck[it], it), 100f, 40f) }
+        assertEquals(places.size, places.toSet().size)
+    }
+
     /** Every seat's card arrives from that seat, and from a card-width or two out. */
     @Test
     fun `a card comes in from its own player's side`() {

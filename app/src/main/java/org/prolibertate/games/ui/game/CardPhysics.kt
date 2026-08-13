@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -64,6 +65,16 @@ const val REST_TILT_DEGREES = 4.5f
 
 /** Most a settled card misses its spot by, as a fraction of its own width. */
 const val REST_DRIFT_FRACTION = 0.055f
+
+/**
+ * The same two bounds for a card thrown onto a heap rather than laid in front
+ * of a player, which is a good deal less tidy. They are also what makes a heap
+ * legible: with the tight bounds a discard pile of five cards looks like one
+ * card, because the four underneath are hidden to within a twentieth of a card
+ * width of the top one.
+ */
+const val HEAP_TILT_DEGREES = 8f
+const val HEAP_DRIFT_FRACTION = 0.15f
 
 /** Extra turn a card carries while it is still travelling. */
 const val THROW_SPIN_DEGREES = 15f
@@ -160,13 +171,27 @@ data class CardRest(
 )
 
 /** The resting scatter for [seed], within the bounds set at the top of the file. */
-fun cardRest(seed: Int): CardRest = CardRest(
-    tiltDegrees = unitNoise(seed, 1) * REST_TILT_DEGREES,
-    driftX = unitNoise(seed, 2) * REST_DRIFT_FRACTION,
-    driftY = unitNoise(seed, 3) * REST_DRIFT_FRACTION,
+fun cardRest(
+    seed: Int,
+    tilt: Float = REST_TILT_DEGREES,
+    drift: Float = REST_DRIFT_FRACTION,
+): CardRest = CardRest(
+    tiltDegrees = unitNoise(seed, 1) * tilt,
+    driftX = unitNoise(seed, 2) * drift,
+    driftY = unitNoise(seed, 3) * drift,
     spinDegrees = unitNoise(seed, 4) * THROW_SPIN_DEGREES,
     lateness = (unitNoise(seed, 5) + 1f) / 2f,
 )
+
+/**
+ * The same, at the looser bounds a heap gets.
+ *
+ * A card keeps this scatter for as long as it is on the heap, including once
+ * something has been played on top of it. Switching a card to a wider scatter
+ * the moment it stopped being the top card would make it shuffle sideways on
+ * its own, which is the one thing on a table that never happens.
+ */
+fun heapRest(seed: Int): CardRest = cardRest(seed, HEAP_TILT_DEGREES, HEAP_DRIFT_FRACTION)
 
 /** The small tilt of a card sitting in a squared-up hand. */
 fun handTilt(seed: Int): Float = unitNoise(seed, 6) * HAND_TILT_DEGREES
@@ -196,6 +221,24 @@ fun pileOrigin(seed: Int, distance: Float = THROW_DISTANCE): Pair<Float, Float> 
 }
 
 /**
+ * Where a card that has been played *on* lies, given how much ground the cards
+ * now covering it take up — half the width and half the height of it, in
+ * pixels.
+ *
+ * Pushed out towards the edge of that ground rather than scattered evenly
+ * across it. A card buried dead centre under a set of four is a card nobody can
+ * see, and the entire point of still drawing it is that you can tell the heap
+ * has a history. Out at the edge a corner shows, which is what a real heap
+ * looks like from above.
+ */
+fun buriedOffset(seed: Int, halfWidth: Float, halfHeight: Float): Pair<Float, Float> {
+    val angle = (unitNoise(seed, 11) + 1f) * PI.toFloat()
+    // Never right at the rim and never far inside it.
+    val reach = 0.72f + 0.28f * abs(unitNoise(seed, 12))
+    return cos(angle) * halfWidth * reach to sin(angle) * halfHeight * reach
+}
+
+/**
  * Acceleration curve for cards being dragged off a table: slow to break away,
  * then gone. Written out rather than taken from an easing class so the sweep
  * arithmetic stays plain Kotlin and can be tested without a composition.
@@ -213,7 +256,8 @@ fun sweepProgress(sweep: Float, rest: CardRest, spread: Float = SWEEP_SPREAD): F
     return accelerate(raw)
 }
 
-private fun blend(from: Float, to: Float, fraction: Float): Float =
+/** Straight interpolation, [fraction] being free to overshoot past one. */
+fun blend(from: Float, to: Float, fraction: Float): Float =
     from + (to - from) * fraction
 
 // ---------------------------------------------------------------------------
@@ -324,7 +368,7 @@ fun Modifier.landed(landing: CardLanding): Modifier = this
     }
 
 /** How many cards of a pile are worth drawing. Below this it is not a heap. */
-private const val PILE_DEPTH = 4
+private const val PILE_DEPTH = 5
 
 /** Holder for [rememberPileWatermark]. Deliberately not snapshot state. */
 private class PileWatermark(var value: Int)
@@ -378,7 +422,7 @@ fun CardPile(
 
     // Room for the scatter, so the outermost card is not clipped by whatever
     // this pile has been placed inside.
-    val margin = width * REST_DRIFT_FRACTION
+    val margin = width * HEAP_DRIFT_FRACTION
     Box(
         modifier = modifier
             .padding(horizontal = margin, vertical = margin)
@@ -388,7 +432,7 @@ fun CardPile(
         for (index in bottom until cards.size) {
             key(index) {
                 val card = cards[index]
-                val rest = cardRest(cardSeed(card, index))
+                val rest = heapRest(cardSeed(card, index))
                 val landing = if (index < alreadyDown) {
                     CardLanding(
                         offsetX = rest.driftX * cardWidthPx,
