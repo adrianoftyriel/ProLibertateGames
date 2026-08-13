@@ -1,5 +1,6 @@
 package org.prolibertate.games.ui.game
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -32,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -181,9 +184,6 @@ private fun seatLabel(relative: Int): String = when (relative) {
     else -> "Right"
 }
 
-/** Duration of the sweep towards the winner. */
-private const val SWEEP_MILLIS = 450
-
 @Composable
 private fun TrickArea(
     state: KaiserState,
@@ -203,7 +203,7 @@ private fun TrickArea(
     }
     val sweep by animateFloatAsState(
         targetValue = if (sweeping && sweepStarted) 1f else 0f,
-        animationSpec = tween(durationMillis = SWEEP_MILLIS),
+        animationSpec = tween(durationMillis = motionMillis(CARD_SWEEP_MILLIS), easing = LinearEasing),
         label = "kaiserSweep",
     )
 
@@ -214,7 +214,9 @@ private fun TrickArea(
         2 -> 0f to -1f
         else -> 1f to 0f
     }
-    val travelPx = with(LocalDensity.current) { (cardWidth * 2.5f).toPx() }
+    val cardWidthPx = with(LocalDensity.current) { cardWidth.toPx() }
+    val travelPx = cardWidthPx * 2.5f
+    val throwMillis = motionMillis(CARD_THROW_MILLIS)
 
     Box(modifier = Modifier.fillMaxSize().padding(4.dp)) {
         if (cardsOnTable.isEmpty()) {
@@ -230,43 +232,64 @@ private fun TrickArea(
         }
 
         cardsOnTable.forEach { played ->
-            val relative = relativePosition(played.seat, localSeat)
-            val alignment = when (relative) {
-                0 -> Alignment.BottomCenter
-                1 -> Alignment.CenterStart
-                2 -> Alignment.TopCenter
-                else -> Alignment.CenterEnd
-            }
-            val rotation = when (relative) {
-                1 -> 90f
-                2 -> 180f
-                3 -> -90f
-                else -> 0f
-            }
+            key(played.seat) {
+                val relative = relativePosition(played.seat, localSeat)
+                val alignment = when (relative) {
+                    0 -> Alignment.BottomCenter
+                    1 -> Alignment.CenterStart
+                    2 -> Alignment.TopCenter
+                    else -> Alignment.CenterEnd
+                }
+                val facing = when (relative) {
+                    1 -> 90f
+                    2 -> 180f
+                    3 -> -90f
+                    else -> 0f
+                }
 
-            Column(
-                modifier = Modifier
-                    .align(alignment)
-                    .offset {
-                        IntOffset(
-                            x = (dirX * travelPx * sweep).roundToInt(),
-                            y = (dirY * travelPx * sweep).roundToInt(),
-                        )
-                    }
-                    .alpha(1f - sweep),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                PlayingCardView(
-                    card = played.card,
-                    width = cardWidth,
-                    caption = counterCaption(played.card),
-                    modifier = Modifier.rotate(rotation),
+                val rest = cardRest(cardSeed(played.card, played.seat))
+                val (fromX, fromY) = seatOrigin(relative)
+                val landing = rememberCardLanding(
+                    key = played.card,
+                    rest = rest,
+                    facingDegrees = facing,
+                    fromX = fromX * cardWidthPx,
+                    fromY = fromY * cardWidthPx,
+                    cardWidthPx = cardWidthPx,
+                    durationMillis = throwMillis,
                 )
-                Text(
-                    text = seatLabel(relative),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                )
+                val leaving = sweepProgress(sweep, rest)
+
+                Column(
+                    modifier = Modifier
+                        .align(alignment)
+                        .offset {
+                            IntOffset(
+                                x = (landing.offsetX + dirX * travelPx * leaving).roundToInt(),
+                                y = (landing.offsetY + dirY * travelPx * leaving).roundToInt(),
+                            )
+                        }
+                        .graphicsLayer {
+                            scaleX = landing.scale
+                            scaleY = landing.scale
+                            alpha = landing.alpha * (1f - leaving)
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    PlayingCardView(
+                        card = played.card,
+                        width = cardWidth,
+                        caption = counterCaption(played.card),
+                        elevation = landing.elevation,
+                        modifier = Modifier
+                            .rotate(landing.rotation + rest.spinDegrees * leaving),
+                    )
+                    Text(
+                        text = seatLabel(relative),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
             }
         }
 
@@ -406,6 +429,7 @@ private fun HandRow(
                     width = cardWidth,
                     enabled = canPlay,
                     caption = counterCaption(card),
+                    modifier = Modifier.rotate(handTilt(cardSeed(card))),
                     onClick = { if (canPlay) onPlay(PlayCard(card)) },
                 )
             }
