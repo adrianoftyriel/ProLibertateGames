@@ -230,6 +230,23 @@ private fun TrickArea(
         val travelPx = cardWidthPx * 2f
         val throwMillis = motionMillis(CARD_THROW_MILLIS)
 
+        val arrived = rememberArrivedTricks(
+            tricksWon = state.tricksWon,
+            sweeping = sweeping,
+            sweepStarted = sweepStarted,
+            sweepMillis = motionMillis(CARD_SWEEP_MILLIS),
+        )
+
+        // What each player has taken, face down beside their own place at the
+        // ring. Drawn first so a trick being gathered passes over its pile.
+        TakenTricksAround(
+            tricksWon = arrived,
+            localSeat = localSeat,
+            players = players,
+            cardWidth = cardWidth,
+            radiusPx = radiusPx,
+        )
+
         if (cardsOnTable.isEmpty()) {
             Text(
                 text = when {
@@ -279,9 +296,10 @@ private fun TrickArea(
                             )
                         }
                         .graphicsLayer {
-                            scaleX = landing.scale
-                            scaleY = landing.scale
-                            alpha = landing.alpha * (1f - leaving)
+                            val gathered = landing.scale * gatherScale(leaving)
+                            scaleX = gathered
+                            scaleY = gathered
+                            alpha = landing.alpha * gatherAlpha(leaving)
                         },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {

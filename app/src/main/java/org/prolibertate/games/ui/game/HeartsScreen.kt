@@ -240,6 +240,16 @@ private fun ScoreRow(state: HeartsState, localSeat: Int) {
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = if (seat == localSeat) FontWeight.Bold else FontWeight.Normal,
                 )
+                // The tricks this player has taken, face down in front of them.
+                // Hearts keeps the cards themselves rather than a count, since
+                // it is the cards that are scored at the end of the round, so
+                // the number of tricks is however many players-worth of them
+                // there are.
+                WonTrickStack(
+                    tricks = state.taken.getOrElse(seat) { emptyList() }.size /
+                        state.options.playerCount,
+                    width = 26.dp,
+                )
                 Text("$score", fontWeight = FontWeight.Bold)
                 // What this round has cost so far, which is the number anybody
                 // actually watches while a hand is being played.

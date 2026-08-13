@@ -218,7 +218,21 @@ private fun TrickArea(
     val travelPx = cardWidthPx * 2.5f
     val throwMillis = motionMillis(CARD_THROW_MILLIS)
 
+    // Kaiser scores in points rather than tricks, but the cards are still won
+    // and still kept, and how many each player is sitting on is worth seeing.
+    val arrived = rememberArrivedTricks(
+        tricksWon = state.tricksWon,
+        sweeping = sweeping,
+        sweepStarted = sweepStarted,
+        sweepMillis = motionMillis(CARD_SWEEP_MILLIS),
+    )
+
     Box(modifier = Modifier.fillMaxSize().padding(4.dp)) {
+
+        // Drawn first, so a trick still being gathered passes over the pile it
+        // is on its way to joining.
+        TakenTricks(arrived, localSeat, cardWidth)
+
         if (cardsOnTable.isEmpty()) {
             Text(
                 text = when {
@@ -270,9 +284,10 @@ private fun TrickArea(
                             )
                         }
                         .graphicsLayer {
-                            scaleX = landing.scale
-                            scaleY = landing.scale
-                            alpha = landing.alpha * (1f - leaving)
+                            val gathered = landing.scale * gatherScale(leaving)
+                            scaleX = gathered
+                            scaleY = gathered
+                            alpha = landing.alpha * gatherAlpha(leaving)
                         },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {

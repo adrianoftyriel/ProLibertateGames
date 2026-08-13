@@ -22,13 +22,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -280,8 +283,34 @@ private fun TableArea(state: CribbageState, localSeat: Int, cardWidth: Dp) {
                         color = ink,
                     )
                 }
-                state.series.forEach { pegged ->
-                    PlayingCardView(card = pegged.card, width = cardWidth * 0.7f)
+                // The series stays on the table until it is counted out, so each
+                // card is laid beside the last rather than replacing it. Keyed
+                // by its place in the series so only the card just pegged is
+                // thrown down.
+                val pegWidth = cardWidth * 0.7f
+                val pegWidthPx = with(LocalDensity.current) { pegWidth.toPx() }
+                val throwMillis = motionMillis(CARD_THROW_MILLIS)
+                state.series.forEachIndexed { place, pegged ->
+                    key(place) {
+                        val seed = cardSeed(pegged.card, place)
+                        val rest = cardRest(seed)
+                        val (fromX, fromY) = pileOrigin(seed)
+                        val landing = rememberCardLanding(
+                            key = place,
+                            rest = rest,
+                            facingDegrees = 0f,
+                            fromX = fromX * pegWidthPx,
+                            fromY = fromY * pegWidthPx,
+                            cardWidthPx = pegWidthPx,
+                            durationMillis = throwMillis,
+                        )
+                        PlayingCardView(
+                            card = pegged.card,
+                            width = pegWidth,
+                            elevation = landing.elevation,
+                            modifier = Modifier.landed(landing),
+                        )
+                    }
                 }
             }
         }
@@ -415,6 +444,7 @@ private fun HandRow(
                     width = cardWidth,
                     enabled = enabled,
                     selected = card in chosen,
+                    modifier = Modifier.rotate(handTilt(cardSeed(card))),
                     onClick = { onTap(card) },
                 )
             }
