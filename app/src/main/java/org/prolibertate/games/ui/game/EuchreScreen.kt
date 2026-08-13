@@ -1,5 +1,6 @@
 package org.prolibertate.games.ui.game
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -184,9 +187,6 @@ private fun seatLabel(relative: Int): String = when (relative) {
 /** How long a completed trick rests on the table before being swept away. */
 const val TRICK_HOLD_MILLIS = 1_000L
 
-/** Duration of the sweep itself. */
-private const val TRICK_SWEEP_MILLIS = 450
-
 @Composable
 private fun TrickArea(
     state: EuchreState,
@@ -206,9 +206,12 @@ private fun TrickArea(
             sweepStarted = true
         }
     }
+    // Driven linearly, because the shape of the sweep belongs to each card
+    // rather than to the clock: sweepProgress gives them their own start and
+    // their own acceleration off this one value.
     val sweep by animateFloatAsState(
         targetValue = if (sweeping && sweepStarted) 1f else 0f,
-        animationSpec = tween(durationMillis = TRICK_SWEEP_MILLIS),
+        animationSpec = tween(durationMillis = motionMillis(CARD_SWEEP_MILLIS), easing = LinearEasing),
         label = "trickSweep",
     )
 
@@ -220,7 +223,9 @@ private fun TrickArea(
         2 -> 0f to -1f
         else -> 1f to 0f
     }
-    val travelPx = with(LocalDensity.current) { (cardWidth * 2.5f).toPx() }
+    val cardWidthPx = with(LocalDensity.current) { cardWidth.toPx() }
+    val travelPx = cardWidthPx * 2.5f
+    val throwMillis = motionMillis(CARD_THROW_MILLIS)
 
     Box(modifier = Modifier.fillMaxSize().padding(4.dp)) {
 
@@ -249,45 +254,74 @@ private fun TrickArea(
             )
         }
 
+        // Keyed by seat: one card per seat per trick, so this holds a card's
+        // flight steady while the trick fills up and while the finished trick
+        // is swapped for the copy that gets swept away. Without it the list
+        // position would decide identity and every card would jump back into
+        // the air whenever another one landed.
         cardsOnTable.forEach { played ->
-            val relative = relativePosition(played.seat, localSeat)
-            val alignment = when (relative) {
-                0 -> Alignment.BottomCenter
-                1 -> Alignment.CenterStart
-                2 -> Alignment.TopCenter
-                else -> Alignment.CenterEnd
-            }
-            // Rotate to face the player who played it: the side seats end up
-            // landscape, the partner's card upside down from your side.
-            val rotation = when (relative) {
-                1 -> 90f
-                2 -> 180f
-                3 -> -90f
-                else -> 0f
-            }
+            key(played.seat) {
+                val relative = relativePosition(played.seat, localSeat)
+                val alignment = when (relative) {
+                    0 -> Alignment.BottomCenter
+                    1 -> Alignment.CenterStart
+                    2 -> Alignment.TopCenter
+                    else -> Alignment.CenterEnd
+                }
+                // Turned to face the player who played it: the side seats end
+                // up landscape, the partner's card upside down from your side.
+                val facing = when (relative) {
+                    1 -> 90f
+                    2 -> 180f
+                    3 -> -90f
+                    else -> 0f
+                }
 
-            Column(
-                modifier = Modifier
-                    .align(alignment)
-                    .offset {
-                        IntOffset(
-                            x = (dirX * travelPx * sweep).roundToInt(),
-                            y = (dirY * travelPx * sweep).roundToInt(),
-                        )
-                    }
-                    .alpha(1f - sweep),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                PlayingCardView(
-                    card = played.card,
-                    width = cardWidth,
-                    modifier = Modifier.rotate(rotation),
+                val rest = cardRest(cardSeed(played.card, played.seat))
+                val (fromX, fromY) = seatOrigin(relative)
+                val landing = rememberCardLanding(
+                    key = played.card,
+                    rest = rest,
+                    facingDegrees = facing,
+                    fromX = fromX * cardWidthPx,
+                    fromY = fromY * cardWidthPx,
+                    cardWidthPx = cardWidthPx,
+                    durationMillis = throwMillis,
                 )
-                Text(
-                    text = seatLabel(relative),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                )
+                val leaving = sweepProgress(sweep, rest)
+
+                Column(
+                    modifier = Modifier
+                        .align(alignment)
+                        .offset {
+                            IntOffset(
+                                x = (landing.offsetX + dirX * travelPx * leaving).roundToInt(),
+                                y = (landing.offsetY + dirY * travelPx * leaving).roundToInt(),
+                            )
+                        }
+                        .graphicsLayer {
+                            scaleX = landing.scale
+                            scaleY = landing.scale
+                            alpha = landing.alpha * (1f - leaving)
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    PlayingCardView(
+                        card = played.card,
+                        width = cardWidth,
+                        elevation = landing.elevation,
+                        // The turn it picks up on the way out is the same turn
+                        // it carried on the way in, so a card leaves the table
+                        // the way it arrived.
+                        modifier = Modifier
+                            .rotate(landing.rotation + rest.spinDegrees * leaving),
+                    )
+                    Text(
+                        text = seatLabel(relative),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
             }
         }
 
@@ -449,6 +483,11 @@ private fun HandRow(
                     card = card,
                     width = cardWidth,
                     enabled = canPlay || canDiscard,
+                    // A hand that has been squared up is still not square. Two
+                    // degrees is below the threshold at which anyone notices a
+                    // tilt and above the one at which a row of cards stops
+                    // looking printed.
+                    modifier = Modifier.rotate(handTilt(cardSeed(card))),
                     onClick = {
                         when {
                             canDiscard -> onPlay(Discard(card))

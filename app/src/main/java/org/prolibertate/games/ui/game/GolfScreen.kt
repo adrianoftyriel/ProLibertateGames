@@ -252,7 +252,14 @@ private fun StockAndDiscard(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("Stock", style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onPrimary)
-            CardBackView(width = cardWidth)
+            // Drawing the pack rather than one back also means an empty stock
+            // now looks empty, where before it showed a card that was not there.
+            if (state.stock.isEmpty()) {
+                Text("empty", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimary)
+            } else {
+                CardBackStack(count = state.stock.size, width = cardWidth)
+            }
             if (legal.contains(DrawFromStock)) {
                 Button(onClick = { onMove(DrawFromStock) }) { Text("Draw") }
             }
@@ -261,7 +268,7 @@ private fun StockAndDiscard(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("Discard", style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onPrimary)
-            state.discard.lastOrNull()?.let { PlayingCardView(card = it, width = cardWidth) }
+            CardPile(cards = state.discard, width = cardWidth)
             if (legal.contains(DrawFromDiscard)) {
                 Button(onClick = { onMove(DrawFromDiscard) }) { Text("Take") }
             }

@@ -20,8 +20,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -155,9 +158,36 @@ private fun PileView(state: PresidentState, cardWidth: Dp) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onPrimary,
         )
+        // The set on top of the pile. A set is played as one gesture but not as
+        // one card: they leave the hand together and land one after another,
+        // which is what the stagger off each card's own seed is for.
+        val onTop = state.pile.takeLast(state.setSize)
+        val topIndex = state.pile.size - onTop.size
+        val cardWidthPx = with(LocalDensity.current) { cardWidth.toPx() }
+        val throwMillis = motionMillis(CARD_THROW_MILLIS)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            state.pile.takeLast(state.setSize).forEach { card ->
-                PlayingCardView(card = card, width = cardWidth)
+            onTop.forEachIndexed { offsetInSet, card ->
+                val place = topIndex + offsetInSet
+                key(place) {
+                    val rest = cardRest(cardSeed(card, place))
+                    val (fromX, fromY) = pileOrigin(cardSeed(card, place))
+                    val landing = rememberCardLanding(
+                        key = place,
+                        rest = rest,
+                        facingDegrees = 0f,
+                        fromX = fromX * cardWidthPx,
+                        fromY = fromY * cardWidthPx,
+                        cardWidthPx = cardWidthPx,
+                        durationMillis = throwMillis,
+                        delayMillis = (rest.lateness * throwMillis * 0.3f).toInt(),
+                    )
+                    PlayingCardView(
+                        card = card,
+                        width = cardWidth,
+                        elevation = landing.elevation,
+                        modifier = Modifier.landed(landing),
+                    )
+                }
             }
         }
         Text(
@@ -258,7 +288,11 @@ private fun HandView(state: PresidentState, localSeat: Int, cardWidth: Dp) {
                 Text("—", style = MaterialTheme.typography.bodySmall)
             }
             hand.forEach { card ->
-                PlayingCardView(card = card, width = cardWidth * 0.8f)
+                PlayingCardView(
+                    card = card,
+                    width = cardWidth * 0.8f,
+                    modifier = Modifier.rotate(handTilt(cardSeed(card))),
+                )
             }
         }
     }
