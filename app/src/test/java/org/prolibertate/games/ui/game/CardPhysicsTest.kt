@@ -209,6 +209,34 @@ class CardPhysicsTest {
         hand.forEach { assertTrue(sweepProgress(0.95f, it) > 0.5f) }
     }
 
+    /**
+     * A gathered card has to still be whole when it reaches the winner's pile,
+     * because it vanishes at the same moment the pile grows by one and that
+     * swap is only invisible if there was something there to swap.
+     */
+    @Test
+    fun `a gathered card is whole most of the way and gone at the end`() {
+        assertEquals(1f, gatherAlpha(0f), 0f)
+        assertEquals(1f, gatherAlpha(0.5f), 0f)
+        assertEquals(0f, gatherAlpha(1f), 0f)
+        var previous = 1f
+        for (step in 0..100) {
+            val now = gatherAlpha(step / 100f)
+            assertTrue("went back up at $step", now <= previous + 0.0001f)
+            assertTrue(now in 0f..1f)
+            previous = now
+        }
+    }
+
+    /** And is squared down into the bundle rather than arriving full size. */
+    @Test
+    fun `a gathered card is squared down on the way`() {
+        assertEquals(1f, gatherScale(0f), 0f)
+        assertTrue(gatherScale(1f) < 1f)
+        assertTrue(gatherScale(1f) > 0.5f)
+        assertTrue(gatherScale(0.5f) < gatherScale(0.25f))
+    }
+
     /** A trick that never completes must not leave a card part way off the table. */
     @Test
     fun `a sweep that never starts moves nothing`() {

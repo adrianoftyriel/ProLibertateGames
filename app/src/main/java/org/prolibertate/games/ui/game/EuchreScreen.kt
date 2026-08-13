@@ -227,7 +227,20 @@ private fun TrickArea(
     val travelPx = cardWidthPx * 2.5f
     val throwMillis = motionMillis(CARD_THROW_MILLIS)
 
+    // The count follows the cards rather than the rules, so a pile grows as the
+    // trick reaches it and not the moment the last card was played.
+    val arrived = rememberArrivedTricks(
+        tricksWon = state.tricksWon,
+        sweeping = sweeping,
+        sweepStarted = sweepStarted,
+        sweepMillis = motionMillis(CARD_SWEEP_MILLIS),
+    )
+
     Box(modifier = Modifier.fillMaxSize().padding(4.dp)) {
+
+        // What each player has taken, face down in front of them. Drawn first
+        // so a trick still being gathered passes over the pile it is joining.
+        TakenTricks(arrived, localSeat, cardWidth)
 
         // The turn card sits in the middle of the table during bidding.
         state.upCard?.let { up ->
@@ -300,9 +313,12 @@ private fun TrickArea(
                             )
                         }
                         .graphicsLayer {
-                            scaleX = landing.scale
-                            scaleY = landing.scale
-                            alpha = landing.alpha * (1f - leaving)
+                            // Squared down into the bundle it is joining, and
+                            // still whole until it gets there.
+                            val gathered = landing.scale * gatherScale(leaving)
+                            scaleX = gathered
+                            scaleY = gathered
+                            alpha = landing.alpha * gatherAlpha(leaving)
                         },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
