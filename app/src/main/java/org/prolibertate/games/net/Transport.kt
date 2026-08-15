@@ -34,6 +34,28 @@ data class DiscoveredHost(
 )
 
 /**
+ * Where a host is listening, for reading out loud.
+ *
+ * Discovery is not always possible — a phone sharing its own hotspot does not
+ * reliably advertise over the tethering interface, whatever the other end does
+ * — so a host has to be able to say where it is in a form somebody can type
+ * into the other phone.
+ */
+data class HostEndpoint(val addresses: List<String>, val port: Int) {
+    /** The one to read out, tethering address first. */
+    val primary: String? get() = addresses.firstOrNull()?.let { "$it:$port" }
+}
+
+/**
+ * The port a host listens on when it can have it.
+ *
+ * Fixed rather than assigned by the system, so that joining by hand is typing
+ * an address and not an address and a five-digit number. A host that finds it
+ * taken falls back to whatever it is given and says so.
+ */
+const val DEFAULT_HOST_PORT = 47_654
+
+/**
  * One peer-to-peer link carrying [NetMessage]s.
  *
  * A transport ends up with a plain pair of streams, so the framing and

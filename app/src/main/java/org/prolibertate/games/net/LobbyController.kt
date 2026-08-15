@@ -34,6 +34,8 @@ class LobbyController(
         val hostName: String = "",
         val seats: List<PlayerSlot> = emptyList(),
         val discovered: List<DiscoveredHost> = emptyList(),
+        /** Where this device is listening while hosting, for reading out. */
+        val endpoint: HostEndpoint? = null,
         val message: String? = null,
         val started: TableConfig? = null,
     )
@@ -89,6 +91,15 @@ class LobbyController(
                 transport.host(hostName, scope).collect { connection ->
                     onClientConnected(connection)
                 }
+            }
+        }
+
+        // Discovery is not guaranteed — a phone sharing its own hotspot cannot
+        // be relied on to advertise over the tethering interface — so where the
+        // host is listening is put on its screen to be read out.
+        jobs += scope.launch {
+            lan.endpoint.collect { endpoint ->
+                _state.value = _state.value.copy(endpoint = endpoint)
             }
         }
     }
@@ -203,6 +214,36 @@ class LobbyController(
                 }
             }
         }
+    }
+
+    /**
+     * Joins a host at an address somebody typed in.
+     *
+     * The way in when discovery cannot work. Two phones on one phone's hotspot
+     * is exactly that case: mDNS over a tethering interface is unreliable in
+     * both directions, and no amount of listening harder fixes it, but the
+     * address is right there on the host's screen and a TCP connection to it
+     * works perfectly well once the socket is pointed at the right network.
+     */
+    fun joinAt(typed: String, displayName: String, peerId: String) {
+        val parsed = parseManualAddress(typed)
+        if (parsed == null) {
+            _state.value = _state.value.copy(
+                message = "That doesn't look like an address. Try 192.168.43.1",
+            )
+            return
+        }
+        join(
+            host = DiscoveredHost(
+                id = "lan:${parsed.address}:${parsed.port}",
+                name = parsed.address,
+                kind = TransportKind.LAN,
+                address = parsed.address,
+                port = parsed.port,
+            ),
+            displayName = displayName,
+            peerId = peerId,
+        )
     }
 
     fun join(host: DiscoveredHost, displayName: String, peerId: String) {
