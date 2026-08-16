@@ -6,6 +6,8 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import java.net.Inet4Address
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.Socket
 
@@ -40,14 +42,42 @@ fun wifiNetwork(context: Context): Network? {
 }
 
 /**
- * Sends this socket out over the Wi-Fi rather than wherever the system would
- * otherwise send it. Silent if there is no Wi-Fi network to bind to: a phone
- * running the hotspot itself has no Wi-Fi *client* network, and reaches its own
- * guests over the tethering interface's own route without any help.
+ * Points this socket at the network [target] is actually on, before it
+ * connects.
+ *
+ * Two different problems wearing the same hat, depending on which end of the
+ * hotspot this phone is.
+ *
+ * A phone that has *joined* a hotspot has a Wi-Fi network, and naming it is
+ * enough. A phone that is *sharing* one does not: its guests live on the
+ * tethering interface, and ConnectivityManager does not offer that as a
+ * [Network] anything can bind to — so the socket falls back to the default
+ * network, which is mobile data, and a connection to a guest goes out over
+ * cellular and dies. Binding this end to an address on the guest's own subnet
+ * picks the route instead, which is the only lever available.
  */
-fun bindToWifi(context: Context, socket: Socket) {
-    val network = wifiNetwork(context) ?: return
-    runCatching { network.bindSocket(socket) }
+fun bindForTarget(context: Context, socket: Socket, target: String) {
+    val network = wifiNetwork(context)
+    if (network != null) {
+        runCatching { network.bindSocket(socket) }
+        return
+    }
+    val source = localIpv4Addresses().firstOrNull { sameSubnet(it, target) } ?: return
+    runCatching { socket.bind(InetSocketAddress(InetAddress.getByName(source), 0)) }
+}
+
+/**
+ * Whether two IPv4 addresses are on the same /24.
+ *
+ * A guess, but a safe one here: every Android hotspot hands out a /24, and the
+ * only thing this decides is which of our own addresses to send from. Getting
+ * it wrong costs a bind that would not have helped anyway.
+ */
+fun sameSubnet(a: String, b: String): Boolean {
+    val left = a.split('.')
+    val right = b.split('.')
+    if (left.size != 4 || right.size != 4) return false
+    return left.subList(0, 3) == right.subList(0, 3)
 }
 
 /**

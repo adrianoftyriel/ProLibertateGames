@@ -1,7 +1,9 @@
 package org.prolibertate.games.net
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -102,5 +104,33 @@ class ManualAddressTest {
     fun `what a host shows is what the other end accepts`() {
         val shown = HostEndpoint(listOf("192.168.43.1"), 47654).primary!!
         assertEquals(ManualAddress("192.168.43.1", 47654), parseManualAddress(shown))
+    }
+
+    // -- Choosing which of our own addresses to send from --------------------
+
+    /**
+     * The phone sharing the hotspot has no Wi-Fi network to bind to, so it
+     * picks a source address on the guest's subnet instead. Getting this wrong
+     * sends the connection out over mobile data.
+     */
+    @Test
+    fun `addresses on one hotspot subnet match`() {
+        assertTrue(sameSubnet("192.168.43.1", "192.168.43.117"))
+        assertTrue(sameSubnet("192.168.1.20", "192.168.1.20"))
+    }
+
+    @Test
+    fun `addresses on different subnets do not`() {
+        assertFalse(sameSubnet("192.168.43.1", "192.168.1.5"))
+        assertFalse(sameSubnet("192.168.43.1", "10.0.0.5"))
+    }
+
+    /** Anything that is not a dotted quad is not a match, rather than a crash. */
+    @Test
+    fun `nonsense is not a match`() {
+        assertFalse(sameSubnet("", "192.168.43.1"))
+        assertFalse(sameSubnet("192.168.43", "192.168.43.1"))
+        assertFalse(sameSubnet("pixel-9.local", "192.168.43.1"))
+        assertFalse(sameSubnet("192.168.43.1.7", "192.168.43.1"))
     }
 }

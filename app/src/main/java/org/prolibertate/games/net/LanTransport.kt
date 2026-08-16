@@ -201,11 +201,11 @@ class LanTransport(private val context: Context) : Transport {
     override suspend fun join(host: DiscoveredHost, scope: CoroutineScope): Connection =
         withContext(Dispatchers.IO) {
             val socket = Socket()
-            // Before connecting, and this is the whole fix for hotspot play: a
+            // Before connecting, and this is the fix for hotspot play: a
             // hotspot has no internet behind it, so Android leaves mobile data
             // as the default network and an unbound socket goes out over
             // cellular looking for a 192.168 address.
-            bindToWifi(context, socket)
+            bindForTarget(context, socket, host.address)
             socket.connect(InetSocketAddress(host.address, host.port), CONNECT_TIMEOUT_MS)
             socket.tcpNoDelay = true
             StreamConnection(
