@@ -16,7 +16,14 @@ import org.prolibertate.games.game.engine.TableConfig
  * takes effect. Each client is sent a state redacted for its own seat, so an
  * opponent's hand is never transmitted in the first place.
  */
-const val PROTOCOL_VERSION = 1
+/**
+ * 2 added the heartbeat. A peer that does not answer [Ping] cannot be told
+ * apart from one that has gone away, so both ends have to speak it or a quiet
+ * link would be dropped as dead the first time nobody moved for a while. The
+ * lobby already refuses a mismatch with "update both devices", which is the
+ * honest thing to say about it.
+ */
+const val PROTOCOL_VERSION = 2
 
 /** Service type and name advertised over mDNS. */
 const val SERVICE_TYPE = "_plgames._tcp"
@@ -115,6 +122,30 @@ data object Resync : NetMessage
 @Serializable
 @SerialName("rejected")
 data class Rejected(val reason: String) : NetMessage
+
+/**
+ * Sent to a link nobody has spoken on for a while, and answered with [Pong].
+ *
+ * Two things need it. A phone whose screen has gone off puts its Wi-Fi radio
+ * into power save and, given long enough, stops the app's networking
+ * altogether; an access point ages an idle association out of its tables. A
+ * link carrying nothing between one player's turn and the next is idle for
+ * minutes at a time, which is exactly what both of those collect. And a TCP
+ * link that dies that way dies quietly: the read never returns and the next
+ * write is buffered into a socket that no longer goes anywhere, so without
+ * traffic of its own the app cannot tell a link that is waiting from one that
+ * is gone.
+ *
+ * Neither reaches a screen — see [StreamConnection], which answers and swallows
+ * them, so nothing above the transport has to know they exist.
+ */
+@Serializable
+@SerialName("ping")
+data object Ping : NetMessage
+
+@Serializable
+@SerialName("pong")
+data object Pong : NetMessage
 
 @Serializable
 @SerialName("bye")

@@ -2,6 +2,7 @@ package org.prolibertate.games.net
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,7 +57,7 @@ class MatchController<S : Any, M : Any>(
      * waits for [confirmAdvance].
      */
     private val awaitsConfirmation: (S) -> Boolean = { false },
-) {
+) : LinkRebinder {
 
     enum class Role { HOST, CLIENT }
 
@@ -111,15 +112,32 @@ class MatchController<S : Any, M : Any>(
     private var released = false
 
     private val peers = mutableMapOf<String, Connection>()
+
+    /**
+     * The reader attached to each peer's link.
+     *
+     * Held so a replaced link's collector can be stopped. Collecting a
+     * [Connection.incoming] never ends on its own — a SharedFlow has no
+     * completion — so a link swapped out mid-match would otherwise leave its
+     * collector behind for the rest of the game.
+     */
+    private val peerJobs = mutableMapOf<String, Job>()
     private var hostLink: Connection? = null
+    private var hostLinkJob: Job? = null
 
     private val seatKinds: Map<Int, PlayerKind> =
         config.seats.associate { it.seat to it.kind }
-    private val seatPeers: Map<Int, String?> =
-        config.seats.associate { it.seat to it.peerId }
+
+    /**
+     * Which link each seat is reached on. Mutable because a player who drops
+     * and comes back is the same player in the same seat, but not necessarily
+     * on the same address — a reconnecting phone can be handed a different one.
+     */
+    private val seatPeers: MutableMap<Int, String?> =
+        config.seats.associate { it.seat to it.peerId }.toMutableMap()
 
     private fun nameOfPeer(peerId: String): String =
-        config.seats.firstOrNull { it.peerId == peerId }?.name ?: "The other player"
+        config.seats.firstOrNull { it.peerId == peerId }?.name ?: "the other player"
 
     /**
      * Records that this table cannot be played any further.
@@ -140,12 +158,7 @@ class MatchController<S : Any, M : Any>(
     /** Host: begin the match and start pushing state to [clients]. */
     fun startAsHost(clients: List<Connection>) {
         check(role == Role.HOST) { "Not hosting" }
-        clients.forEach { connection ->
-            peers[connection.peerId] = connection
-            scope.launch {
-                connection.incoming.collect { message -> onHostMessage(connection, message) }
-            }
-        }
+        clients.forEach { connection -> listenToPeer(connection) }
         scope.launch {
             val initial = runCatching { rules.initialState(config) }.getOrElse { error ->
                 // A table the rules will not accept is a dead end, not a reason
@@ -162,11 +175,18 @@ class MatchController<S : Any, M : Any>(
         }
     }
 
+    private fun listenToPeer(connection: Connection) {
+        peers[connection.peerId] = connection
+        peerJobs[connection.peerId] = scope.launch {
+            connection.incoming.collect { message -> onHostMessage(connection, message) }
+        }
+    }
+
     /** Client: render whatever arrives from [link]. */
     fun startAsClient(link: Connection) {
         check(role == Role.CLIENT) { "Not a client" }
         hostLink = link
-        scope.launch {
+        hostLinkJob = scope.launch {
             link.incoming
                 // Asked for from inside onSubscription, which is what makes it
                 // reliable: the request cannot leave before this collector is
@@ -196,17 +216,73 @@ class MatchController<S : Any, M : Any>(
 
                         is Rejected -> _notice.value = message.reason
                         is Bye -> {
-                            // The host has gone: the game cannot go on, and
-                            // saying so is what gives the screen something to
-                            // offer a way out of.
+                            // The link to the host has gone, either because the
+                            // host left or because the link died under it. The
+                            // two are indistinguishable from this end, so this
+                            // says only what is actually known — and it stops
+                            // the table, which gives the screen a way out to
+                            // offer if getting back in does not work.
                             _legalMoves.value = emptyList()
-                            abandon("The host left the game.")
+                            abandon("The connection to the host was lost.")
                         }
 
                         else -> Unit
                     }
                 }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Getting back in
+    // -----------------------------------------------------------------------
+
+    /**
+     * Host: a player who dropped is back, on [connection].
+     *
+     * The seat, and the position it is sitting in, were never given up — only
+     * the link was — so nothing here touches the game. The old link is let go
+     * of, the new one is read from, and the seat is sent the table as it now
+     * stands so the returning player has something to play on.
+     */
+    override fun rebindPeer(seat: Int, connection: Connection) {
+        if (role != Role.HOST) return
+        val previous = seatPeers[seat]
+        if (previous != null) {
+            peerJobs.remove(previous)?.cancel()
+            // Not closed: the lobby owns these sockets and has already dealt
+            // with the one being replaced. Closing a link this end has stopped
+            // reading would only race the reader that is on its way out.
+            peers.remove(previous)
+        }
+        seatPeers[seat] = connection.peerId
+        listenToPeer(connection)
+        // Only once everybody is reachable again. At a table of four, one player
+        // coming back says nothing about the other one who has not.
+        if (seatPeers.values.filterNotNull().all { peers[it]?.isOpen == true }) {
+            clearAbandoned()
+        }
+        scope.launch { sendStateTo(connection) }
+    }
+
+    /**
+     * Client: the way back to the host is [connection].
+     *
+     * The collector asks for a resync as it attaches, which is what fills the
+     * screen back in: everything a client draws came off the wire, and whatever
+     * was pushed while the link was down was pushed into nothing.
+     */
+    override fun rebindHostLink(connection: Connection) {
+        if (role != Role.CLIENT) return
+        if (hostLink === connection) return
+        hostLinkJob?.cancel()
+        clearAbandoned()
+        startAsClient(connection)
+    }
+
+    /** Puts a table that was stopped back into play. */
+    private fun clearAbandoned() {
+        _abandoned.value = null
+        _notice.value = null
     }
 
     // -----------------------------------------------------------------------
@@ -232,10 +308,15 @@ class MatchController<S : Any, M : Any>(
 
     private suspend fun onHostMessage(connection: Connection, message: NetMessage) {
         if (message is Bye) {
-            // One of the players has left. The host keeps the position — there is
-            // nothing wrong with it — but a table that cannot go on should say so
-            // rather than leave somebody waiting on a move that is not coming.
-            abandon("${nameOfPeer(connection.peerId)} left the game.")
+            // Anything arriving on a link that has since been replaced belongs
+            // to the link, not to the seat: a player who dropped and came back
+            // must not be reported as having left on the way in.
+            if (peers[connection.peerId] !== connection) return
+            // One of the players is no longer reachable. The host keeps the
+            // position — there is nothing wrong with it — but a table that
+            // cannot go on should say so rather than leave somebody waiting on a
+            // move that is not coming.
+            abandon("The connection to ${nameOfPeer(connection.peerId)} was lost.")
             return
         }
         if (message is Resync) {
@@ -433,8 +514,12 @@ class MatchController<S : Any, M : Any>(
      * [StreamConnection.close], which this leans on to not block.
      */
     fun close() {
+        peerJobs.values.forEach { it.cancel() }
+        peerJobs.clear()
         peers.values.forEach { runCatching { it.close() } }
         peers.clear()
+        hostLinkJob?.cancel()
+        hostLinkJob = null
         runCatching { hostLink?.close() }
         hostLink = null
     }
