@@ -3,6 +3,7 @@ package org.prolibertate.games.net
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -31,17 +32,49 @@ class LanTransport(private val context: Context) : Transport {
     private val nsdManager: NsdManager
         get() = context.getSystemService(Context.NSD_SERVICE) as NsdManager
 
+    private val wifiManager: WifiManager
+        get() = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+
     private var serverSocket: ServerSocket? = null
     private var registrationListener: NsdManager.RegistrationListener? = null
     private var discoveryListener: NsdManager.DiscoveryListener? = null
+    private var wifiLock: WifiManager.WifiLock? = null
 
     override fun isAvailable(): Boolean = true
+
+    /**
+     * Keeps the Wi-Fi radio properly awake for as long as there is a game on.
+     *
+     * Android puts the radio into power save when the screen goes off, which is
+     * what a locked phone is, and a link left to it drops out from under a game
+     * that is still being played. FULL_HIGH_PERF is the mode that says otherwise
+     * — the deprecation notice points at LOW_LATENCY, which is the wrong one
+     * here: that one only applies while the screen is on and the app is in
+     * front, which is precisely the case that was never broken.
+     */
+    @Suppress("DEPRECATION")
+    private fun holdRadio() {
+        if (wifiLock?.isHeld == true) return
+        val lock = wifiLock ?: runCatching {
+            wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, WIFI_LOCK_TAG)
+                .also { it.setReferenceCounted(false) }
+        }.getOrNull() ?: return
+        wifiLock = lock
+        runCatching { lock.acquire() }
+    }
+
+    private fun releaseRadio() {
+        wifiLock?.let { lock -> runCatching { if (lock.isHeld) lock.release() } }
+        wifiLock = null
+    }
 
     // -----------------------------------------------------------------------
     // Hosting
     // -----------------------------------------------------------------------
 
     override fun host(displayName: String, scope: CoroutineScope): Flow<Connection> = callbackFlow {
+        holdRadio()
+
         // Port 0 lets the OS pick a free port, which is then advertised.
         val server = ServerSocket(0)
         serverSocket = server
@@ -66,6 +99,7 @@ class LanTransport(private val context: Context) : Transport {
             while (isActive && !server.isClosed) {
                 val socket = runCatching { server.accept() }.getOrNull() ?: break
                 socket.tcpNoDelay = true
+                socket.keepAlive = true
                 val connection = StreamConnection(
                     peerId = socket.inetAddress?.hostAddress ?: "unknown",
                     kind = TransportKind.LAN,
@@ -90,6 +124,8 @@ class LanTransport(private val context: Context) : Transport {
     // -----------------------------------------------------------------------
 
     override fun discover(scope: CoroutineScope): Flow<List<DiscoveredHost>> = callbackFlow {
+        holdRadio()
+
         val found = Collections.synchronizedMap(linkedMapOf<String, DiscoveredHost>())
 
         fun publish() {
@@ -177,9 +213,11 @@ class LanTransport(private val context: Context) : Transport {
 
     override suspend fun join(host: DiscoveredHost, scope: CoroutineScope): Connection =
         withContext(Dispatchers.IO) {
+            holdRadio()
             val socket = Socket()
             socket.connect(InetSocketAddress(host.address, host.port), CONNECT_TIMEOUT_MS)
             socket.tcpNoDelay = true
+            socket.keepAlive = true
             StreamConnection(
                 peerId = host.id,
                 kind = TransportKind.LAN,
@@ -207,9 +245,11 @@ class LanTransport(private val context: Context) : Transport {
         stopDiscovery()
         runCatching { serverSocket?.close() }
         serverSocket = null
+        releaseRadio()
     }
 
     private companion object {
         const val CONNECT_TIMEOUT_MS = 8_000
+        const val WIFI_LOCK_TAG = "ProLibertateGames:lan"
     }
 }
