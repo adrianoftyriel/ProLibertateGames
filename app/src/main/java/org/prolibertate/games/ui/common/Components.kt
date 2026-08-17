@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -42,6 +43,13 @@ fun PlayingCardView(
     selected: Boolean = false,
     enabled: Boolean = true,
     /**
+     * How far off the surface the card is sitting. The default is the thickness
+     * of a card lying on a table, which is what separates a card *on* the felt
+     * from a card painted onto it; a card in flight is raised further by
+     * whatever is animating it.
+     */
+    elevation: Dp = CARD_RESTING_ELEVATION,
+    /**
      * Short note printed on the face, for when the rank and suit alone do not
      * say what the card does — a Sequence jack being the obvious case, since
      * one-eyed and two-eyed jacks are only distinguishable by their artwork.
@@ -54,6 +62,7 @@ fun PlayingCardView(
         modifier = modifier
             .width(width)
             .aspectRatio(CARD_ASPECT)
+            .shadow(elevation, RoundedCornerShape(width * 0.12f))
             .clip(RoundedCornerShape(width * 0.12f))
             .background(Color.White)
             .border(
@@ -102,11 +111,13 @@ fun PlayingCardView(
 fun CardBackView(
     modifier: Modifier = Modifier,
     width: Dp = 64.dp,
+    elevation: Dp = CARD_RESTING_ELEVATION,
 ) {
     Box(
         modifier = modifier
             .width(width)
             .aspectRatio(CARD_ASPECT)
+            .shadow(elevation, RoundedCornerShape(width * 0.12f))
             .clip(RoundedCornerShape(width * 0.12f))
             .background(MaterialTheme.colorScheme.primary)
             .border(1.dp, Color(0x33000000), RoundedCornerShape(width * 0.12f)),
@@ -121,3 +132,11 @@ fun CardBackView(
 }
 
 const val CARD_ASPECT = 5f / 7f
+
+/**
+ * A card lying on a surface. Small enough to read as the thickness of a piece
+ * of card rather than as a floating tile — the miniature card backs used as
+ * hand counters are twelve dp wide, and anything heavier turns those into
+ * smudges.
+ */
+val CARD_RESTING_ELEVATION: Dp = 1.5.dp

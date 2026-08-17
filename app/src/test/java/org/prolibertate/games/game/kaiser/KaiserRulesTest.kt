@@ -250,6 +250,39 @@ class KaiserRulesTest {
         assertEquals("all four held for display", 4, state.completedTrick.size)
     }
 
+    /**
+     * Kaiser scores in points, not tricks, so nothing in the rules reads this
+     * count — the table does, to draw the cards each player has taken. That is
+     * exactly why it is worth a test: a field no rule depends on is a field
+     * that can quietly stop being maintained.
+     */
+    @Test
+    fun `tricks are counted to the seat that took them`() {
+        // Everything is clubs and nothing is trump, so each trick simply goes
+        // to the highest card in it: the ace, then the king.
+        val hands = listOf(
+            listOf(Card(Rank.ACE, Suit.CLUBS), Card(Rank.SEVEN, Suit.CLUBS)),
+            listOf(Card(Rank.EIGHT, Suit.CLUBS), Card(Rank.NINE, Suit.CLUBS)),
+            listOf(Card(Rank.TEN, Suit.CLUBS), Card(Rank.JACK, Suit.CLUBS)),
+            listOf(Card(Rank.QUEEN, Suit.CLUBS), Card(Rank.KING, Suit.CLUBS)),
+        )
+        var state = playingState(hands, trump = Suit.SPADES)
+        assertEquals("nothing taken at the deal", listOf(0, 0, 0, 0), state.tricksWon)
+
+        repeat(4) {
+            val seat = KaiserRules.currentSeat(state)!!
+            state = KaiserRules.applyMove(state, seat, PlayCard(state.hands[seat].first()))
+        }
+        assertEquals("the ace takes the first", listOf(1, 0, 0, 0), state.tricksWon)
+
+        repeat(4) {
+            val seat = KaiserRules.currentSeat(state)!!
+            state = KaiserRules.applyMove(state, seat, PlayCard(state.hands[seat].first()))
+        }
+        assertEquals("the king takes the second", listOf(1, 0, 0, 1), state.tricksWon)
+        assertEquals("and they add up", 2, state.tricksWon.sum())
+    }
+
     // -- Scoring ------------------------------------------------------------
 
     @Test

@@ -62,6 +62,7 @@ object KaiserRules : GameRules<KaiserState, KaiserMove> {
             leader = (dealer + 1) % 4,
             lastTrickWinner = null,
             handPoints = listOf(0, 0),
+            tricksWon = List(4) { 0 },
             scores = scores,
             log = log,
         )
@@ -224,10 +225,14 @@ object KaiserRules : GameRules<KaiserState, KaiserMove> {
         val handPoints = played.handPoints.toMutableList()
         handPoints[teamOf(winner)] = handPoints[teamOf(winner)] + points
 
+        val tricksWon = played.tricksWon.toMutableList()
+        tricksWon[winner] = tricksWon[winner] + 1
+
         val afterTrick = played.copy(
             trick = emptyList(),
             completedTrick = trick,
             handPoints = handPoints,
+            tricksWon = tricksWon,
             leader = winner,
             turn = winner,
             lastTrickWinner = winner,
