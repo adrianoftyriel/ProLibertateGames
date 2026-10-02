@@ -182,4 +182,13 @@ class ScoreSheetTest {
         assertEquals(0, sheet.totals()[sheet.players[0].id])
         assertEquals(4, sheet.totals()[sheet.players[1].id])
     }
+
+    @Test
+    fun `a zero that was entered is kept, unlike a cell left blank`() {
+        val sheet = sheetOf("Alice", "Bob").let { it.withRound(mapOf(it.players[0].id to 0)) }
+        val round = sheet.rounds.first()
+        assertEquals(0, round.deltas[sheet.players[0].id])
+        assertEquals(null, round.deltas[sheet.players[1].id])
+        assertEquals(0, sheet.total(sheet.players[0].id))
+    }
 }

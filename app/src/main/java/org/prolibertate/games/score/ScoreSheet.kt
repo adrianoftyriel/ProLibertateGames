@@ -21,9 +21,9 @@ data class ScorePlayer(val id: Int, val name: String = "")
 /**
  * What each player scored in one round, keyed by [ScorePlayer.id].
  *
- * A player absent from the map scored nothing, which is the same as zero — so
- * a round where only one person scored carries one entry rather than a column
- * of noughts.
+ * A player absent from the map had nothing entered, which counts as zero in the
+ * totals — so a round where only one person scored carries one entry rather
+ * than a column of noughts. A 0 that was typed is kept, so it can be shown.
  */
 @Serializable
 data class ScoreRound(val deltas: Map<Int, Int> = emptyMap()) {
@@ -114,12 +114,12 @@ data class ScoreSheet(
     }
 
     /**
-     * A round holding only what is worth storing: entries for players who are
-     * still at the table, and only where somebody actually scored.
+     * A round holding only entries for players who are still at the table.
+     * Zeros stay: a typed 0 is different from a cell left blank.
      */
     private fun roundOf(deltas: Map<Int, Int>): ScoreRound {
         val ids = players.map { it.id }.toSet()
-        return ScoreRound(deltas.filterKeys { it in ids }.filterValues { it != 0 })
+        return ScoreRound(deltas.filterKeys { it in ids })
     }
 
     /** Drops points recorded against anybody no longer at the table. */
