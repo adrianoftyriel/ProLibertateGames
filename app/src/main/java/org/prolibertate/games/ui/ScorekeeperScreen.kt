@@ -42,6 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -193,8 +195,20 @@ private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onChange: (ScoreSheet) 
     var renaming by remember { mutableStateOf(-1) }
     // Which cell the ± button flips: the last one typed into.
     var lastTyped by remember { mutableStateOf(-1) }
+    // The cell to put the cursor in when a round is opened by tapping it.
+    var focusPlayer by remember { mutableStateOf(-1) }
 
     val editing = if (correcting >= 0) correction else pending
+
+    // Opens a round for correction. Both the round number and any of its cells
+    // come through here, so tapping a score edits that score directly.
+    val startCorrection: (Int, Int) -> Unit = { index, focus ->
+        correcting = index
+        correction.clear()
+        sheet.rounds[index].deltas.forEach { (id, points) -> correction[id] = points.toString() }
+        lastTyped = -1
+        focusPlayer = focus
+    }
 
     // Keep the row being filled in in view when a round is written down.
     LaunchedEffect(sheet.rounds.size) { rows.animateScrollTo(rows.maxValue) }
@@ -264,15 +278,7 @@ private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onChange: (ScoreSheet) 
                                     if (underCorrection) {
                                         correcting = -1
                                     } else {
-                                        correcting = index
-                                        correction.clear()
-                                        sheet.players.forEach { player ->
-                                            val points = round.delta(player.id)
-                                            if (points != 0) {
-                                                correction[player.id] = points.toString()
-                                            }
-                                        }
-                                        lastTyped = -1
+                                        startCorrection(index, -1)
                                     }
                                 },
                             )
@@ -282,13 +288,17 @@ private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onChange: (ScoreSheet) 
                         if (underCorrection) {
                             PointsField(
                                 text = correction[player.id].orEmpty(),
+                                autoFocus = focusPlayer == player.id,
                                 onText = {
                                     correction[player.id] = it
                                     lastTyped = player.id
                                 },
                             )
                         } else {
-                            PointsCell(text = signed(round.delta(player.id)))
+                            PointsCell(
+                                text = signed(round.deltas[player.id]),
+                                onClick = { startCorrection(index, player.id) },
+                            )
                         }
                     }
                 }
@@ -358,17 +368,20 @@ private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onChange: (ScoreSheet) 
                     pending.clear()
                 }
                 lastTyped = -1
+                focusPlayer = -1
             },
             onDelete = {
                 onChange(sheet.withoutRound(correcting))
                 correcting = -1
                 correction.clear()
                 lastTyped = -1
+                focusPlayer = -1
             },
             onCancel = {
                 correcting = -1
                 correction.clear()
                 lastTyped = -1
+                focusPlayer = -1
             },
         )
     }
@@ -583,11 +596,12 @@ private fun RoundLabel(text: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun PointsCell(text: String, muted: Boolean = false) {
+private fun PointsCell(text: String, muted: Boolean = false, onClick: (() -> Unit)? = null) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .border(Dp.Hairline, MaterialTheme.colorScheme.outlineVariant),
+            .border(Dp.Hairline, MaterialTheme.colorScheme.outlineVariant)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -603,9 +617,11 @@ private fun PointsCell(text: String, muted: Boolean = false) {
     }
 }
 
-/** A cell being typed into. Blank means nothing scored, which is the same as nought. */
+/** A cell being typed into. Blank means nothing entered; a typed 0 is kept and shown. */
 @Composable
-private fun PointsField(text: String, onText: (String) -> Unit) {
+private fun PointsField(text: String, onText: (String) -> Unit, autoFocus: Boolean = false) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(autoFocus) { if (autoFocus) focus.requestFocus() }
     BasicTextField(
         value = text,
         onValueChange = { onText(sanitiseAmount(it)) },
@@ -616,7 +632,7 @@ private fun PointsField(text: String, onText: (String) -> Unit) {
         ),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().focusRequester(focus),
         decorationBox = { field ->
             Box(
                 modifier = Modifier
@@ -758,14 +774,13 @@ private fun flipSign(text: String): String {
     return (-value).toString()
 }
 
-/** The typed cells as points. Blanks, a lone minus and noughts all drop out. */
+/** The typed cells as points. Blanks and a lone minus drop out; a typed 0 stays. */
 private fun amountsAsPoints(amounts: Map<Int, String>): Map<Int, Int> =
-    amounts.mapNotNull { (id, text) -> text.toIntOrNull()?.takeIf { it != 0 }?.let { id to it } }
-        .toMap()
+    amounts.mapNotNull { (id, text) -> text.toIntOrNull()?.let { id to it } }.toMap()
 
-/** Nothing scored shows as an empty cell rather than a nought in every column. */
-private fun signed(points: Int): String = when {
+/** Not entered shows as an empty cell; an entered 0 shows as 0. */
+private fun signed(points: Int?): String = when {
+    points == null -> ""
     points > 0 -> "+$points"
-    points < 0 -> points.toString()
-    else -> ""
+    else -> points.toString()
 }
