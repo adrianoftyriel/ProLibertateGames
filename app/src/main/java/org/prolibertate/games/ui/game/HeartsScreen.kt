@@ -18,6 +18,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -25,6 +26,8 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.prolibertate.games.game.cards.Card
@@ -126,6 +129,7 @@ fun HeartsScreen(
                         selected = chosen.contains(card),
                         enabled = if (selectable) true else playable.contains(card),
                         caption = pointsOf(card).takeIf { it > 0 }?.let { "−$it" },
+                        modifier = Modifier.rotate(handTilt(cardSeed(card))),
                         onClick = {
                             if (selectable) {
                                 toggle(chosen, card)
@@ -188,13 +192,35 @@ private fun TrickView(state: HeartsState) {
         if (showing.isEmpty()) {
             Text("Nothing played yet.", style = MaterialTheme.typography.bodySmall)
         } else {
+            // Hearts lays its trick out in a row rather than round a table, so
+            // there is no seat direction to throw a card in from — each one
+            // comes in from its own side, which the seed decides and keeps.
+            val width = 46.dp
+            val widthPx = with(LocalDensity.current) { width.toPx() }
+            val throwMillis = motionMillis(CARD_THROW_MILLIS)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 showing.forEach { played ->
-                    PlayingCardView(
-                        card = played.card,
-                        width = 46.dp,
-                        caption = "seat ${played.seat}",
-                    )
+                    key(played.seat) {
+                        val seed = cardSeed(played.card, played.seat)
+                        val rest = cardRest(seed)
+                        val (fromX, fromY) = pileOrigin(seed)
+                        val landing = rememberCardLanding(
+                            key = played.card,
+                            rest = rest,
+                            facingDegrees = 0f,
+                            fromX = fromX * widthPx,
+                            fromY = fromY * widthPx,
+                            cardWidthPx = widthPx,
+                            durationMillis = throwMillis,
+                        )
+                        PlayingCardView(
+                            card = played.card,
+                            width = width,
+                            caption = "seat ${played.seat}",
+                            elevation = landing.elevation,
+                            modifier = Modifier.landed(landing),
+                        )
+                    }
                 }
             }
         }
@@ -213,6 +239,16 @@ private fun ScoreRow(state: HeartsState, localSeat: Int) {
                     text = if (seat == localSeat) "You" else "Seat $seat",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = if (seat == localSeat) FontWeight.Bold else FontWeight.Normal,
+                )
+                // The tricks this player has taken, face down in front of them.
+                // Hearts keeps the cards themselves rather than a count, since
+                // it is the cards that are scored at the end of the round, so
+                // the number of tricks is however many players-worth of them
+                // there are.
+                WonTrickStack(
+                    tricks = state.taken.getOrElse(seat) { emptyList() }.size /
+                        state.options.playerCount,
+                    width = 26.dp,
                 )
                 Text("$score", fontWeight = FontWeight.Bold)
                 // What this round has cost so far, which is the number anybody

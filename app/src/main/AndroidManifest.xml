@@ -6,6 +6,11 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Network Service Discovery needs multicast to see hosts on the LAN. -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- Holding a Wi-Fi lock keeps the radio out of power save while a game is
+         on, so a phone locked between turns does not drop out of it. The lock
+         is a wake lock as far as the system is concerned, hence the permission;
+         nothing here ever holds the screen or the CPU awake. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Lets the app hand a downloaded APK to the system installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 

@@ -9,6 +9,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import org.prolibertate.games.game.GameCatalog
 import org.prolibertate.games.game.chess.ChessAi
 import org.prolibertate.games.game.chess.ChessMove
@@ -683,6 +686,32 @@ private fun <S : Any, M : Any> StartMatch(
         }
     }
     DisposableEffect(controller) {
-        onDispose { controller.close() }
+        // The lobby owns the sockets and goes on listening for the whole match,
+        // so it is the lobby that reconnects a dropped player — and this is
+        // where it finds the table to hand the new link to.
+        env.lobby.rebinder = controller
+        onDispose {
+            env.lobby.rebinder = null
+            controller.close()
+        }
+    }
+
+    // Coming back to a table that has been out of sight.
+    //
+    // A locked phone is a stopped activity, and its Wi-Fi radio goes to sleep
+    // with the screen. Anything the host pushed in the meantime — the player's
+    // own turn arriving is the one that matters — was pushed at a link that may
+    // no longer have been there, and a client draws nothing but what it was
+    // sent. So the table is asked for again on the way back in, over a fresh
+    // link if the old one did not survive.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, route.hosting) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START && !route.hosting) {
+                env.lobby.restoreLink()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 }

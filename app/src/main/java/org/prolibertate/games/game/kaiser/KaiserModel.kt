@@ -92,6 +92,14 @@ data class KaiserState(
     val lastTrickWinner: Int?,
     /** Points taken this hand, per team. */
     val handPoints: List<Int>,
+    /**
+     * Tricks taken this hand, per seat. Kaiser scores in points rather than
+     * tricks, so nothing in the rules needs this — it is what the table draws
+     * in front of each player, and a player who has taken four tricks and no
+     * counters has still taken four tricks. Defaulted so a client on an older
+     * build can still read a state from the wire.
+     */
+    val tricksWon: List<Int> = List(4) { 0 },
     val scores: List<Int>,
     val log: List<String>,
 )

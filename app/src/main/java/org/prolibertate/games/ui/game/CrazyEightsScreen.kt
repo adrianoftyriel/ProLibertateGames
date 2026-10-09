@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -181,7 +182,10 @@ private fun PileArea(state: CrazyEightsState, cardWidth: Dp) {
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
                 } else {
-                    CardBackView(width = cardWidth)
+                    // A pack, not a single back: the stock is the one thing on
+                    // this screen that is visibly a stack of card, and drawing
+                    // it as one is most of what makes the table look real.
+                    CardBackStack(count = state.stock.size, width = cardWidth)
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -190,7 +194,9 @@ private fun PileArea(state: CrazyEightsState, cardWidth: Dp) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
-                state.topCard?.let { PlayingCardView(card = it, width = cardWidth) }
+                // The discard heap rather than only its top card, so a card
+                // played onto it lands on something.
+                CardPile(cards = state.discard, width = cardWidth)
             }
         }
         // An eight on top says nothing about what may be played next, so the
@@ -331,6 +337,7 @@ private fun HandRow(
                     enabled = canPlay,
                     selected = card == pendingWild,
                     caption = if (isWild(card)) "WILD" else null,
+                    modifier = Modifier.rotate(handTilt(cardSeed(card))),
                     onClick = { onTap(card) },
                 )
             }

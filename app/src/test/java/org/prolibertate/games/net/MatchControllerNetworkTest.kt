@@ -228,15 +228,76 @@ class MatchControllerNetworkTest {
         guestLeft.start()
         guestLeft.leave(Side.GUEST)
         guestLeft.settle()
-        assertEquals("Guest left the game.", guestLeft.host.abandoned.value)
+        assertEquals("The connection to Guest was lost.", guestLeft.host.abandoned.value)
 
         val hostLeft = chess()
         hostLeft.start()
         hostLeft.leave(Side.HOST)
         hostLeft.settle()
-        assertEquals("The host left the game.", hostLeft.client.abandoned.value)
+        assertEquals("The connection to the host was lost.", hostLeft.client.abandoned.value)
         // Nothing more can be played on a table with no host.
         assertEquals(emptyList<ChessMove>(), hostLeft.client.legalMoves.value)
+    }
+
+    // -----------------------------------------------------------------------
+    // Coming back
+    // -----------------------------------------------------------------------
+
+    /**
+     * The bug this is here for: a phone locked when its turn came round could
+     * not play once it was unlocked again.
+     *
+     * A locked phone puts its Wi-Fi radio to sleep, and a link carrying nothing
+     * between one turn and the next is exactly what that drops. The game was
+     * never wrong — the host still had the position and the seat was still the
+     * player's — but the only route to it was gone, and nothing rebuilt it. The
+     * board came back on unlocking with the state it had before the turn
+     * arrived, and every tap on it went nowhere.
+     */
+    @Test
+    fun `a guest whose link died can play again once it is back`() = runBlocking {
+        val table = chess()
+        table.start()
+        table.white("e2", "e4")
+        // Twenty replies to 1. e4 — the guest is on the clock.
+        assertEquals(20, table.client.legalMoves.value.size)
+
+        table.dropGuestLink()
+        assertNotNull("A dead link has to stop the table", table.client.abandoned.value)
+        assertNotNull(table.host.abandoned.value)
+
+        table.reconnectGuest()
+
+        assertNull("The table is playable again and must not say otherwise", table.client.abandoned.value)
+        assertNull(table.host.abandoned.value)
+        assertNotNull("The guest came back to an empty board", table.client.state.value)
+        assertEquals(
+            "The guest is back but has nothing it is allowed to play",
+            20,
+            table.client.legalMoves.value.size,
+        )
+
+        // And a move made on the new link is a move that actually happens.
+        table.black("e7", "e5")
+        assertNotNull(table.host.state.value?.board?.get(squareFromName("e5")))
+        assertNull(table.host.state.value?.board?.get(squareFromName("e7")))
+    }
+
+    /**
+     * A guest coming back must not be treated as a guest arriving. The host end
+     * of the old link is the one that died; anything it has left to say about
+     * itself belongs to it and not to the seat, which is occupied again.
+     */
+    @Test
+    fun `a guest coming back is not reported as having left`() = runBlocking {
+        val table = chess()
+        table.start()
+        table.dropGuestLink()
+        table.reconnectGuest()
+        table.settle()
+
+        assertNull(table.host.abandoned.value)
+        assertNull(table.client.abandoned.value)
     }
 
     @Test
@@ -273,6 +334,11 @@ class MatchControllerNetworkTest {
         private val hostScope = CoroutineScope(Job() + Dispatchers.Default)
         private val clientScope = CoroutineScope(Job() + Dispatchers.Default)
 
+        /** Every socket a reconnection has opened since, so dispose can close them. */
+        private val laterSockets = mutableListOf<Socket>()
+        private val guestPeerId: String
+        private val guestSeat: Int
+
         val hostLink: StreamConnection
         private val clientLink: StreamConnection
         val host: MatchController<S, M>
@@ -281,7 +347,8 @@ class MatchControllerNetworkTest {
         init {
             clientSocket.connect(InetSocketAddress("127.0.0.1", server.localPort), CONNECT_MILLIS)
             hostSocket = server.accept()
-            val guestPeerId = hostSocket.inetAddress?.hostAddress ?: "guest"
+            guestPeerId = hostSocket.inetAddress?.hostAddress ?: "guest"
+            guestSeat = (0 until seatCount).first { it != hostSeat }
 
             hostLink = StreamConnection(
                 peerId = guestPeerId,
@@ -332,11 +399,7 @@ class MatchControllerNetworkTest {
                 )
 
             host = controller(MatchController.Role.HOST, hostSeat, hostScope)
-            client = controller(
-                MatchController.Role.CLIENT,
-                (0 until seatCount).first { it != hostSeat },
-                clientScope,
-            )
+            client = controller(MatchController.Role.CLIENT, guestSeat, clientScope)
 
             // The lobby is already reading the guest's link when the game starts,
             // and goes on reading it for the whole match. Without this the test
@@ -372,6 +435,54 @@ class MatchControllerNetworkTest {
             settle()
         }
 
+        /**
+         * The guest's link dies under it, as a sleeping radio drops one.
+         *
+         * The sockets are killed rather than the connections closed: a link
+         * either end let go of on purpose is a player leaving, which is a
+         * different thing entirely and is already tested above.
+         */
+        suspend fun dropGuestLink() {
+            runCatching { hostSocket.close() }
+            runCatching { clientSocket.close() }
+            settle()
+        }
+
+        /**
+         * The guest dials the host again, which is still listening on the same
+         * port, and both ends are handed the new link — the host from its lobby
+         * on the guest's Hello, the guest from its own once that has gone
+         * through.
+         */
+        suspend fun reconnectGuest() {
+            val socket = Socket()
+            socket.connect(InetSocketAddress("127.0.0.1", server.localPort), CONNECT_MILLIS)
+            val accepted = server.accept()
+            laterSockets += socket
+            laterSockets += accepted
+
+            val newHostLink = StreamConnection(
+                peerId = guestPeerId,
+                kind = TransportKind.LAN,
+                input = accepted.getInputStream(),
+                output = accepted.getOutputStream(),
+                scope = hostScope,
+                onClosed = { runCatching { accepted.close() } },
+            )
+            val newClientLink = StreamConnection(
+                peerId = "lan:host",
+                kind = TransportKind.LAN,
+                input = socket.getInputStream(),
+                output = socket.getOutputStream(),
+                scope = clientScope,
+                onClosed = { runCatching { socket.close() } },
+            )
+
+            host.rebindPeer(guestSeat, newHostLink)
+            client.rebindHostLink(newClientLink)
+            settle()
+        }
+
         /** Exactly what AppRoot.pop() and PlayScreen's onDispose do, in that order. */
         fun leave(side: Side) {
             if (side == Side.HOST) {
@@ -392,6 +503,7 @@ class MatchControllerNetworkTest {
         fun dispose() {
             runCatching { hostSocket.close() }
             runCatching { clientSocket.close() }
+            laterSockets.forEach { runCatching { it.close() } }
             runCatching { server.close() }
             runCatching { hostLink.close() }
             runCatching { clientLink.close() }

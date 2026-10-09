@@ -173,7 +173,7 @@ production package instead.
 - `.github/workflows/ci.yml` — builds, tests and lints on `dev` and on pull
   requests into `dev` or `main`. Its APK artifact is a dev build, versioned
   `<series>.0-dev` — the series being whatever `plgVersionSeries` says in
-  `gradle.properties`, currently **1.1**.
+  `gradle.properties`, currently **1.3**.
 - `.github/workflows/release.yml` — on push to `main`, builds the APK and
   publishes it as a GitHub Release tagged `v<series>.<run-number>`. The in-app updater
   reads that tag, which is why the APK's `versionCode` is the same run number.
@@ -201,7 +201,7 @@ A version is **`<series>.<run number>`**. The series is set by hand, once, in
 `gradle.properties`:
 
 ```properties
-plgVersionSeries=1.1
+plgVersionSeries=1.3
 ```
 
 Both workflows read that same property when they name a release tag, and the

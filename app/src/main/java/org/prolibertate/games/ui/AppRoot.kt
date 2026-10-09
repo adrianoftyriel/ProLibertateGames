@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +46,7 @@ import org.prolibertate.games.net.LobbyController
 import org.prolibertate.games.score.ScorekeeperRepository
 import org.prolibertate.games.settings.Settings
 import org.prolibertate.games.settings.SettingsRepository
+import org.prolibertate.games.ui.game.LocalCardSpeed
 import org.prolibertate.games.update.UpdateChannel
 import org.prolibertate.games.update.Updater
 
@@ -121,14 +123,19 @@ fun AppRoot(env: AppEnv) {
     var splashDone by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        AppContent(
-            env = env,
-            settings = settings,
-            stack = stack,
-            showComingSoon = showComingSoon,
-            push = push,
-            pop = pop,
-        )
+        // Card motion reads its speed from here rather than from a parameter.
+        // Every card screen animates, most of them several layers deep, and the
+        // alternative was passing one unchanging number down through all of it.
+        CompositionLocalProvider(LocalCardSpeed provides settings.animationSpeed) {
+            AppContent(
+                env = env,
+                settings = settings,
+                stack = stack,
+                showComingSoon = showComingSoon,
+                push = push,
+                pop = pop,
+            )
+        }
 
         // Over the top, so the menu behind it is already composed when it fades.
         if (!splashDone) {
