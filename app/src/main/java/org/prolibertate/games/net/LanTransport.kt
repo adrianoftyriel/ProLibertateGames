@@ -8,6 +8,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -23,7 +26,9 @@ import java.util.Collections
  *
  * NSD is used rather than a UDP broadcast ping because it works across the
  * Wi-Fi isolation settings most home routers ship with, and because Android
- * gives us the resolver for free.
+ * gives us the resolver for free. It is not, however, trusted to be enough:
+ * see [endpoint] and [LocalNetwork] for what a phone's own hotspot does to
+ * both discovery and routing, and for the way round it.
  */
 class LanTransport(private val context: Context) : Transport {
 
@@ -34,11 +39,17 @@ class LanTransport(private val context: Context) : Transport {
 
     private val wifiManager: WifiManager
         get() = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+    private val multicast = MulticastGuard(context)
 
     private var serverSocket: ServerSocket? = null
     private var registrationListener: NsdManager.RegistrationListener? = null
     private var discoveryListener: NsdManager.DiscoveryListener? = null
     private var wifiLock: WifiManager.WifiLock? = null
+
+    private val _endpoint = MutableStateFlow<HostEndpoint?>(null)
+
+    /** Where this device is listening while hosting, so it can be read out. */
+    val endpoint: StateFlow<HostEndpoint?> = _endpoint.asStateFlow()
 
     override fun isAvailable(): Boolean = true
 
@@ -75,9 +86,15 @@ class LanTransport(private val context: Context) : Transport {
     override fun host(displayName: String, scope: CoroutineScope): Flow<Connection> = callbackFlow {
         holdRadio()
 
-        // Port 0 lets the OS pick a free port, which is then advertised.
-        val server = ServerSocket(0)
+        // The known port when it can be had, so that joining by hand needs an
+        // address and nothing else; anything free if something already has it.
+        val server = runCatching { ServerSocket(DEFAULT_HOST_PORT) }
+            .getOrElse { ServerSocket(0) }
         serverSocket = server
+        _endpoint.value = HostEndpoint(localIpv4Addresses(), server.localPort)
+
+        // Advertising is mDNS, and mDNS is multicast.
+        multicast.acquire()
 
         val serviceInfo = NsdServiceInfo().apply {
             serviceName = "$SERVICE_NAME @ $displayName"
@@ -116,6 +133,7 @@ class LanTransport(private val context: Context) : Transport {
             acceptJob.cancel()
             stopAdvertising()
             runCatching { server.close() }
+            _endpoint.value = null
         }
     }
 
@@ -199,6 +217,10 @@ class LanTransport(private val context: Context) : Transport {
         }
         discoveryListener = listener
 
+        // Listening for mDNS replies needs the multicast filter held open just
+        // as much as answering does.
+        multicast.acquire()
+
         publish()
         runCatching {
             nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener)
@@ -215,6 +237,11 @@ class LanTransport(private val context: Context) : Transport {
         withContext(Dispatchers.IO) {
             holdRadio()
             val socket = Socket()
+            // Before connecting, and this is the fix for hotspot play: a
+            // hotspot has no internet behind it, so Android leaves mobile data
+            // as the default network and an unbound socket goes out over
+            // cellular looking for a 192.168 address.
+            bindForTarget(context, socket, host.address)
             socket.connect(InetSocketAddress(host.address, host.port), CONNECT_TIMEOUT_MS)
             socket.tcpNoDelay = true
             socket.keepAlive = true
@@ -243,9 +270,11 @@ class LanTransport(private val context: Context) : Transport {
     override fun stop() {
         stopAdvertising()
         stopDiscovery()
+        multicast.release()
         runCatching { serverSocket?.close() }
         serverSocket = null
         releaseRadio()
+        _endpoint.value = null
     }
 
     private companion object {
