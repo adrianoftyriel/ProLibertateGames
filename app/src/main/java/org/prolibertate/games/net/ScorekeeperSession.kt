@@ -70,6 +70,13 @@ class ScorekeeperSession(
         val discovered: List<DiscoveredHost> = emptyList(),
         /** Host: where this device is listening, for reading out. */
         val endpoint: HostEndpoint? = null,
+        /**
+         * Host: links accepted, and hellos read off them. For telling "nobody
+         * reached this phone" from "they reached it and were not understood",
+         * which look the same from the other end.
+         */
+        val connections: Int = 0,
+        val hellos: Int = 0,
         val message: String? = null,
     )
 
@@ -142,6 +149,7 @@ class ScorekeeperSession(
     }
 
     private fun listenToGuest(connection: Connection) {
+        _state.update { it.copy(connections = it.connections + 1) }
         jobs += scope.launch {
             connection.incoming.collect { message ->
                 synchronized(lock) { onHostMessage(connection, message) }
@@ -192,6 +200,7 @@ class ScorekeeperSession(
     }
 
     private fun onHello(connection: Connection, hello: Hello) {
+        _state.update { it.copy(hellos = it.hellos + 1) }
         val refusal = when {
             hello.purpose != PURPOSE_SCOREKEEPER -> "That is a score sheet, not a game."
             hello.protocol != PROTOCOL_VERSION -> "Different app version — update both devices."
@@ -377,6 +386,7 @@ class ScorekeeperSession(
             link = connection
             heardBack = false
             replica.reset()
+            _state.update { it.copy(message = "Connected. Waiting for ${it.hostName} to answer…") }
         }
         val hello = Hello(peerId = deviceId, displayName = joinedName, purpose = PURPOSE_SCOREKEEPER)
         linkJob = scope.launch {
