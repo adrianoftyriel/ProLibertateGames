@@ -83,7 +83,11 @@ class LanTransport(private val context: Context) : Transport {
     // Hosting
     // -----------------------------------------------------------------------
 
-    override fun host(displayName: String, scope: CoroutineScope): Flow<Connection> = callbackFlow {
+    override fun host(
+        displayName: String,
+        scope: CoroutineScope,
+        purpose: HostPurpose,
+    ): Flow<Connection> = callbackFlow {
         holdRadio()
 
         // The known port when it can be had, so that joining by hand needs an
@@ -97,7 +101,7 @@ class LanTransport(private val context: Context) : Transport {
         multicast.acquire()
 
         val serviceInfo = NsdServiceInfo().apply {
-            serviceName = "$SERVICE_NAME @ $displayName"
+            serviceName = "${serviceLabel(purpose)} @ $displayName"
             serviceType = SERVICE_TYPE
             port = server.localPort
         }
@@ -175,6 +179,7 @@ class LanTransport(private val context: Context) : Transport {
                             kind = TransportKind.LAN,
                             address = address,
                             port = info.port,
+                            purpose = purposeOf(info.serviceName),
                         )
                         synchronized(found) { found[host.id] = host }
                         publish()
@@ -278,6 +283,22 @@ class LanTransport(private val context: Context) : Transport {
     }
 
     private companion object {
+        /**
+         * The service name is the only thing a host says about itself before
+         * anyone has connected, so what it is hosting goes in it.
+         */
+        const val SCOREKEEPER_LABEL = "$SERVICE_NAME Scorekeeper"
+
+        fun serviceLabel(purpose: HostPurpose): String =
+            if (purpose == HostPurpose.SCOREKEEPER) SCOREKEEPER_LABEL else SERVICE_NAME
+
+        fun purposeOf(serviceName: String?): HostPurpose =
+            if (serviceName?.startsWith("$SCOREKEEPER_LABEL @") == true) {
+                HostPurpose.SCOREKEEPER
+            } else {
+                HostPurpose.GAME
+            }
+
         const val CONNECT_TIMEOUT_MS = 8_000
         const val WIFI_LOCK_TAG = "ProLibertateGames:lan"
     }
