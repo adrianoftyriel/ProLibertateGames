@@ -173,6 +173,9 @@ fun ScorekeeperScreen(
         actions = {
             when (role) {
                 Role.NONE -> if (sheet.started && !joining) {
+                    // A sheet already on the go is no reason to hide the way to
+                    // somebody else's.
+                    TextButton(onClick = { joining = true }) { Text("Join") }
                     TextButton(onClick = {
                         session.startHosting(playerName, local)
                         showShare = true
@@ -182,7 +185,13 @@ fun ScorekeeperScreen(
 
                 Role.HOST -> {
                     TextButton(onClick = { showShare = true }) {
-                        Text(if (shared.guests.isEmpty()) "Sharing" else "Sharing (${shared.guests.size})")
+                        Text(
+                            when {
+                                shared.requests.isNotEmpty() -> "Sharing · ${shared.requests.size} waiting"
+                                shared.guests.isNotEmpty() -> "Sharing (${shared.guests.size})"
+                                else -> "Sharing"
+                            }
+                        )
                     }
                     if (sheet.started) {
                         TextButton(onClick = { confirmNewGame = true }) { Text("New game") }
@@ -259,7 +268,8 @@ fun ScorekeeperScreen(
                 onDeny = { session.deny(request.id) },
             )
         }
-        if (showShare) {
+        // Not under a request: two dialogs stacked is how an answer gets missed.
+        if (showShare && shared.requests.isEmpty()) {
             ShareDialog(
                 shared = shared,
                 onRemove = { session.remove(it) },

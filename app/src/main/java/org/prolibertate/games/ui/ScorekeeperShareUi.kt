@@ -210,6 +210,10 @@ internal fun ShareDialog(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+                Text(
+                    text = "Links received: ${shared.connections} · join requests: ${shared.hellos}",
+                    style = MaterialTheme.typography.labelSmall,
+                )
                 Divider()
                 Text("On the sheet", fontWeight = FontWeight.Bold)
                 if (shared.guests.isEmpty()) {

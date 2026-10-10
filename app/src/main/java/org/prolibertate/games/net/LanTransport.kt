@@ -135,9 +135,17 @@ class LanTransport(private val context: Context) : Transport {
 
         awaitClose {
             acceptJob.cancel()
-            stopAdvertising()
+            // Only what this call set up. Hosting stopped and started again
+            // runs this for the old host after the new one has begun, and
+            // letting it clear the shared fields would unregister the new
+            // host's advertisement and blank the address it shows.
+            runCatching { nsdManager.unregisterService(listener) }
+            if (registrationListener === listener) registrationListener = null
             runCatching { server.close() }
-            _endpoint.value = null
+            if (serverSocket === server) {
+                serverSocket = null
+                _endpoint.value = null
+            }
         }
     }
 
