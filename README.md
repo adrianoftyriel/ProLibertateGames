@@ -79,6 +79,26 @@ Points are taken away by typing a minus, or with the **±** button, which flips
 the last number typed. Not every keyboard offers a minus on its number pad, and
 subtracting has to work on all of them.
 
+### Sharing a sheet between devices
+
+Tap **Share** and this phone becomes the host of its sheet; others choose
+**Scorekeeper → Join a shared sheet nearby**. Discovery and joining by address
+work exactly as they do for a game, hotspot included. Nobody is let in on their
+own say-so: the host gets a prompt with the guest's name and has to **Allow** or
+**Deny** it. A guest who was let in and drops out — a locked phone, say — is let
+straight back in rather than asked again, and the host can **Remove** anybody
+from the Sharing panel.
+
+Everyone on the sheet can add rounds, correct them, rename and move columns. The
+host's copy is the truth, and what travels is what was *done* ("add a round
+with these points"), not whole sheets, so two people entering a round at once
+get two rounds rather than one overwriting the other. A guest's own change shows
+immediately and is laid over whatever the host sends until the host confirms it.
+**Sync** asks the host for the sheet as it stands, and happens by itself when the
+app comes back to the front. The host keeps the sheet as its own saved one;
+a guest's view is not saved, and leaving puts them back on their own sheet. Only
+the host can start a new game.
+
 The sheet is saved as it is edited, so leaving the app or taking a phone call
 does not lose the game. It is kept in its own DataStore rather than with the
 settings, because it is a game in progress rather than a preference.

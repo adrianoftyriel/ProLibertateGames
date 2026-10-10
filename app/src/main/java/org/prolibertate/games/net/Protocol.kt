@@ -6,6 +6,8 @@ import kotlinx.serialization.json.Json
 import org.prolibertate.games.game.engine.PlayerKind
 import org.prolibertate.games.game.engine.PlayerSlot
 import org.prolibertate.games.game.engine.TableConfig
+import org.prolibertate.games.score.ScoreSheet
+import org.prolibertate.games.score.SheetOp
 
 /**
  * The wire protocol, shared by every transport.
@@ -24,6 +26,10 @@ import org.prolibertate.games.game.engine.TableConfig
  * honest thing to say about it.
  */
 const val PROTOCOL_VERSION = 2
+
+/** What a [Hello] is asking to join. Absent means a game, which is all there was before. */
+const val PURPOSE_GAME = "game"
+const val PURPOSE_SCOREKEEPER = "scorekeeper"
 
 /** Service type and name advertised over mDNS. */
 const val SERVICE_TYPE = "_plgames._tcp"
@@ -63,6 +69,13 @@ data class Hello(
     val peerId: String,
     val displayName: String,
     val protocol: Int = PROTOCOL_VERSION,
+    /**
+     * Whether this is somebody joining a game or a shared score sheet. Both
+     * listen the same way, so a phone pointed at the wrong sort of host by a typed
+     * address needs a way to be told so rather than waiting for a table that will
+     * never start.
+     */
+    val purpose: String = PURPOSE_GAME,
 ) : NetMessage
 
 /** Host's reply, or a refusal if the lobby is full or the versions differ. */
@@ -150,3 +163,26 @@ data object Pong : NetMessage
 @Serializable
 @SerialName("bye")
 data object Bye : NetMessage
+
+/**
+ * The host's score sheet, sent to a guest on joining, whenever it changes, and
+ * whenever the guest asks with [Resync].
+ *
+ * The whole sheet rather than the change: a sheet is a few hundred bytes, and a
+ * guest that has missed a message is put right by the next one instead of
+ * needing to be told what it missed. [acknowledged] is the last [SheetEdit] from
+ * *this* guest that the sheet already includes, which is how the guest knows
+ * which of its own changes it may stop holding on top of it.
+ */
+@Serializable
+@SerialName("sheet")
+data class SheetState(
+    val revision: Int,
+    val sheet: ScoreSheet,
+    val acknowledged: Int = 0,
+) : NetMessage
+
+/** A guest's change to the shared sheet. The host applies it, then answers with [SheetState]. */
+@Serializable
+@SerialName("sheet-edit")
+data class SheetEdit(val seq: Int, val op: SheetOp) : NetMessage
