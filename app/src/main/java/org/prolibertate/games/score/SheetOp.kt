@@ -28,11 +28,11 @@ sealed interface SheetOp {
     fun applyTo(sheet: ScoreSheet): ScoreSheet
 }
 
-/** Sets a fresh sheet up for [count] players. */
+/** Sets a fresh sheet up for [count] players, scored by round or by tally. */
 @Serializable
 @SerialName("start")
-data class StartSheet(val count: Int) : SheetOp {
-    override fun applyTo(sheet: ScoreSheet): ScoreSheet = ScoreSheet.of(count)
+data class StartSheet(val count: Int, val mode: ScoringMode = ScoringMode.ROUNDS) : SheetOp {
+    override fun applyTo(sheet: ScoreSheet): ScoreSheet = ScoreSheet.of(count, mode)
 }
 
 /** Rubs everything out. */

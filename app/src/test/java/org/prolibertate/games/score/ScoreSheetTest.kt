@@ -191,4 +191,22 @@ class ScoreSheetTest {
         assertEquals(null, round.deltas[sheet.players[1].id])
         assertEquals(0, sheet.total(sheet.players[0].id))
     }
+
+    @Test
+    fun `a sheet defaults to round scoring and tally is chosen at start`() {
+        assertEquals(ScoringMode.ROUNDS, ScoreSheet.of(3).mode)
+        assertEquals(ScoringMode.TALLY, StartSheet(3, ScoringMode.TALLY).applyTo(ScoreSheet()).mode)
+        assertEquals(ScoringMode.ROUNDS, StartSheet(3).applyTo(ScoreSheet()).mode)
+    }
+
+    @Test
+    fun `tally entries add up per player and can be taken back`() {
+        val sheet = ScoreSheet.of(2, ScoringMode.TALLY)
+        val (a, b) = sheet.players.map { it.id }
+        val scored = sheet.withTally(a, 1).withTally(b, 5).withTally(a, 2).withTally(a, -1)
+        assertEquals(2, scored.total(a))
+        assertEquals(5, scored.total(b))
+        assertEquals(3, scored.withoutRound(3).total(a))
+        assertEquals(ScoringMode.TALLY, scored.mode)
+    }
 }
