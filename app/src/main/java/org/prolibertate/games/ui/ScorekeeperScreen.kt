@@ -74,6 +74,7 @@ import org.prolibertate.games.score.RemovePlayer
 import org.prolibertate.games.score.RenamePlayer
 import org.prolibertate.games.score.ScorePlayer
 import org.prolibertate.games.score.ScoreSheet
+import org.prolibertate.games.score.ScoringMode
 import org.prolibertate.games.score.ScorekeeperRepository
 import org.prolibertate.games.score.SheetOp
 import org.prolibertate.games.score.StartSheet
@@ -217,7 +218,7 @@ fun ScorekeeperScreen(
 
             role == Role.GUEST -> Column(modifier = modifier) {
                 ConnectionBanner(shared = shared, onSync = { session.sync() })
-                Sheet(modifier = Modifier.weight(1f), sheet = sheet, onOp = change)
+                Scoring(modifier = Modifier.weight(1f), sheet = sheet, onOp = change)
             }
 
             joining && role == Role.NONE ->
@@ -225,11 +226,11 @@ fun ScorekeeperScreen(
 
             !sheet.started -> SetupPane(
                 modifier = modifier,
-                onStart = { count -> change(StartSheet(count)) },
+                onStart = { count, mode -> change(StartSheet(count, mode)) },
                 onJoin = { joining = true },
             )
 
-            else -> Sheet(modifier = modifier, sheet = sheet, onOp = change)
+            else -> Scoring(modifier = modifier, sheet = sheet, onOp = change)
         }
     }
 
@@ -286,8 +287,9 @@ fun ScorekeeperScreen(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SetupPane(modifier: Modifier, onStart: (Int) -> Unit, onJoin: () -> Unit) {
+private fun SetupPane(modifier: Modifier, onStart: (Int, ScoringMode) -> Unit, onJoin: () -> Unit) {
     var count by remember { mutableStateOf(ScoreSheet.DEFAULT_PLAYERS) }
+    var mode by remember { mutableStateOf(ScoringMode.ROUNDS) }
 
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
@@ -298,6 +300,28 @@ private fun SetupPane(modifier: Modifier, onStart: (Int) -> Unit, onJoin: () -> 
                 "whatever is on the table. A column each, a row per round, and the " +
                 "tally kept for you at the foot.",
             style = MaterialTheme.typography.bodyMedium,
+        )
+        Text("How is it scored?", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = mode == ScoringMode.ROUNDS,
+                onClick = { mode = ScoringMode.ROUNDS },
+                label = { Text("By round") },
+            )
+            FilterChip(
+                selected = mode == ScoringMode.TALLY,
+                onClick = { mode = ScoringMode.TALLY },
+                label = { Text("Tally") },
+            )
+        }
+        Text(
+            text = if (mode == ScoringMode.ROUNDS) {
+                "Everyone's points are written down together, a row per round."
+            } else {
+                "Anybody can score at any moment: tap +1, or enter any amount, " +
+                    "with no rounds to finish."
+            },
+            style = MaterialTheme.typography.bodySmall,
         )
         Text("How many are playing?", style = MaterialTheme.typography.labelLarge)
         FlowRow(
@@ -318,7 +342,7 @@ private fun SetupPane(modifier: Modifier, onStart: (Int) -> Unit, onJoin: () -> 
                 "without losing anybody's score.",
             style = MaterialTheme.typography.bodySmall,
         )
-        PrimaryAction(text = "Start scoring") { onStart(count) }
+        PrimaryAction(text = "Start scoring") { onStart(count, mode) }
         OutlinedButton(onClick = onJoin, modifier = Modifier.fillMaxWidth()) {
             Text("Join a shared sheet nearby")
         }
@@ -328,6 +352,15 @@ private fun SetupPane(modifier: Modifier, onStart: (Int) -> Unit, onJoin: () -> 
 // ---------------------------------------------------------------------------
 // The sheet: a column per player, a row per round, totals ruled off at the foot
 // ---------------------------------------------------------------------------
+
+@Composable
+private fun Scoring(modifier: Modifier, sheet: ScoreSheet, onOp: (SheetOp) -> Unit) {
+    if (sheet.mode == ScoringMode.TALLY) {
+        TallySheet(modifier = modifier, sheet = sheet, onOp = onOp)
+    } else {
+        Sheet(modifier = modifier, sheet = sheet, onOp = onOp)
+    }
+}
 
 @Composable
 private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onOp: (SheetOp) -> Unit) {
@@ -558,6 +591,127 @@ private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onOp: (SheetOp) -> Unit
                 renaming = -1
             },
             onDismiss = { renaming = -1 },
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tally: points scored by anybody, whenever
+// ---------------------------------------------------------------------------
+
+/**
+ * A card per player with their running total and quick buttons, and the entries
+ * so far listed underneath, newest first. Each entry is a one-player row on the
+ * sheet, so tapping one in the list takes it back off.
+ */
+@Composable
+private fun TallySheet(modifier: Modifier, sheet: ScoreSheet, onOp: (SheetOp) -> Unit) {
+    var renaming by remember { mutableStateOf(-1) }
+    var custom by remember { mutableStateOf(-1) }
+
+    Column(modifier = modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Tap a name to rename it. Tap an entry below to take it back.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        sheet.players.forEach { player ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(Dp.Hairline, MaterialTheme.colorScheme.outline)
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = sheet.displayName(player),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).clickable { renaming = player.id },
+                )
+                Text(
+                    text = sheet.total(player.id).toString(),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.width(64.dp),
+                    textAlign = TextAlign.Center,
+                )
+                OutlinedButton(onClick = { onOp(AddRound(mapOf(player.id to -1))) }) { Text("−1") }
+                Button(onClick = { onOp(AddRound(mapOf(player.id to 1))) }) { Text("+1") }
+                TextButton(onClick = { custom = player.id }) { Text("…") }
+            }
+        }
+        OutlinedButton(
+            onClick = { onOp(AddPlayer) },
+            enabled = sheet.players.size < ScoreSheet.MAX_PLAYERS,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Add a player") }
+
+        Text("Entries", style = MaterialTheme.typography.labelLarge)
+        if (sheet.rounds.isEmpty()) {
+            Text("Nothing scored yet.", style = MaterialTheme.typography.bodySmall)
+        }
+        sheet.rounds.indices.reversed().forEach { index ->
+            val entry = sheet.rounds[index].deltas.entries.firstOrNull()
+            val who = entry?.let { e -> sheet.players.firstOrNull { it.id == e.key } }
+            if (entry != null && who != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOp(DeleteRound(index)) }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("${index + 1}. ${sheet.displayName(who)}", style = MaterialTheme.typography.bodyMedium)
+                    Text(signed(entry.value), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
+
+    val renamed = sheet.players.firstOrNull { it.id == renaming }
+    if (renamed != null) {
+        RenameDialog(
+            sheet = sheet,
+            player = renamed,
+            onName = { onOp(RenamePlayer(renamed.id, it)) },
+            onRemove = {
+                onOp(RemovePlayer(renamed.id))
+                renaming = -1
+            },
+            onDismiss = { renaming = -1 },
+        )
+    }
+
+    val scorer = sheet.players.firstOrNull { it.id == custom }
+    if (scorer != null) {
+        var amount by remember(scorer.id) { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { custom = -1 },
+            title = { Text("Points for ${sheet.displayName(scorer)}") },
+            text = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = amount,
+                        onValueChange = { amount = sanitiseAmount(it) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedButton(onClick = { amount = flipSign(amount) }, enabled = amount.toIntOrNull() != null) { Text("±") }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        amount.toIntOrNull()?.let { onOp(AddRound(mapOf(scorer.id to it))) }
+                        custom = -1
+                    },
+                    enabled = amount.toIntOrNull() != null,
+                ) { Text("Add") }
+            },
+            dismissButton = { TextButton(onClick = { custom = -1 }) { Text("Cancel") } },
         )
     }
 }

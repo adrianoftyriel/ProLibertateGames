@@ -31,6 +31,18 @@ data class ScoreRound(val deltas: Map<Int, Int> = emptyMap()) {
 }
 
 /**
+ * How points get onto a sheet.
+ *
+ * [ROUNDS] fills in a row per round, with an entry for whoever scored in it.
+ * [TALLY] has no rounds: any player scores at any moment, one entry at a time.
+ * Both keep their entries in [ScoreSheet.rounds] — a tally entry is just a row
+ * with a single player in it — so totals, editing, undo and sharing work the
+ * same for either, and only the way the sheet is drawn differs.
+ */
+@Serializable
+enum class ScoringMode { ROUNDS, TALLY }
+
+/**
  * A pencil-and-paper score sheet: some players, and a row of points per round.
  *
  * Every change returns a new sheet rather than mutating this one, so the screen
@@ -44,6 +56,8 @@ data class ScoreSheet(
     val rounds: List<ScoreRound> = emptyList(),
     /** The next id to hand out. Only ever counts up; see [ScorePlayer.id]. */
     val nextPlayerId: Int = 1,
+    /** Chosen when the sheet is started and fixed until it is rubbed out. */
+    val mode: ScoringMode = ScoringMode.ROUNDS,
 ) {
     /** A sheet with nobody on it has not been set up yet. */
     val started: Boolean get() = players.isNotEmpty()
@@ -100,6 +114,9 @@ data class ScoreSheet(
         return copy(players = reordered)
     }
 
+    /** One tally entry: [points] to a single player, whenever they scored. */
+    fun withTally(playerId: Int, points: Int): ScoreSheet = withRound(mapOf(playerId to points))
+
     fun withRound(deltas: Map<Int, Int>): ScoreSheet = copy(rounds = rounds + roundOf(deltas))
 
     /** Corrects a round already written down. Out-of-range indices do nothing. */
@@ -134,6 +151,7 @@ data class ScoreSheet(
         const val DEFAULT_PLAYERS = 4
 
         /** A fresh sheet seated for [count] players, none of them named yet. */
-        fun of(count: Int): ScoreSheet = ScoreSheet().withPlayerCount(count)
+        fun of(count: Int, mode: ScoringMode = ScoringMode.ROUNDS): ScoreSheet =
+            ScoreSheet(mode = mode).withPlayerCount(count)
     }
 }
