@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -52,6 +53,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -607,7 +609,6 @@ private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onOp: (SheetOp) -> Unit
 @Composable
 private fun TallySheet(modifier: Modifier, sheet: ScoreSheet, onOp: (SheetOp) -> Unit) {
     var renaming by remember { mutableStateOf(-1) }
-    var custom by remember { mutableStateOf(-1) }
 
     Column(modifier = modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -634,12 +635,12 @@ private fun TallySheet(modifier: Modifier, sheet: ScoreSheet, onOp: (SheetOp) ->
                     text = sheet.total(player.id).toString(),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(64.dp),
+                    modifier = Modifier.width(56.dp),
                     textAlign = TextAlign.Center,
                 )
                 OutlinedButton(onClick = { onOp(AddRound(mapOf(player.id to -1))) }) { Text("−1") }
                 Button(onClick = { onOp(AddRound(mapOf(player.id to 1))) }) { Text("+1") }
-                TextButton(onClick = { custom = player.id }) { Text("…") }
+                AmountBox(onAmount = { onOp(AddRound(mapOf(player.id to it))) })
             }
         }
         OutlinedButton(
@@ -683,36 +684,61 @@ private fun TallySheet(modifier: Modifier, sheet: ScoreSheet, onOp: (SheetOp) ->
             onDismiss = { renaming = -1 },
         )
     }
+}
 
-    val scorer = sheet.players.firstOrNull { it.id == custom }
-    if (scorer != null) {
-        var amount by remember(scorer.id) { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { custom = -1 },
-            title = { Text("Points for ${sheet.displayName(scorer)}") },
-            text = {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = amount,
-                        onValueChange = { amount = sanitiseAmount(it) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedButton(onClick = { amount = flipSign(amount) }, enabled = amount.toIntOrNull() != null) { Text("±") }
+/**
+ * A number box that scores whatever is typed into it. Tapping it brings up the
+ * number pad at once; Done on the pad adds the amount and clears the box. The
+ * ± inside flips the sign, since not every number pad has a minus.
+ */
+@Composable
+private fun AmountBox(onAmount: (Int) -> Unit) {
+    var text by remember { mutableStateOf("") }
+    val submit = {
+        text.toIntOrNull()?.let(onAmount)
+        text = ""
+    }
+    Row(
+        modifier = Modifier
+            .width(96.dp)
+            .height(44.dp)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.primary)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BasicTextField(
+            value = text,
+            onValueChange = { text = sanitiseAmount(it) },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { submit() }),
+            modifier = Modifier.weight(1f),
+            decorationBox = { field ->
+                Box(contentAlignment = Alignment.Center) {
+                    if (text.isEmpty()) {
+                        Text(
+                            text = "pts",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        )
+                    }
+                    field()
                 }
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        amount.toIntOrNull()?.let { onOp(AddRound(mapOf(scorer.id to it))) }
-                        custom = -1
-                    },
-                    enabled = amount.toIntOrNull() != null,
-                ) { Text("Add") }
-            },
-            dismissButton = { TextButton(onClick = { custom = -1 }) { Text("Cancel") } },
         )
+        if (text.toIntOrNull() != null) {
+            Text(
+                text = "±",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.clickable { text = flipSign(text) }.padding(horizontal = 6.dp),
+            )
+        }
     }
 }
 
