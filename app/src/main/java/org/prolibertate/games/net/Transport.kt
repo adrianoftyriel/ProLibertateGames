@@ -24,6 +24,9 @@ enum class TransportKind(val label: String) {
     LAN("Wi-Fi"),
 }
 
+/** What a host is hosting, so a phone looking for one sort is not shown the other. */
+enum class HostPurpose { GAME, SCOREKEEPER }
+
 /**
  * A host someone could join, found by one of the transports. [address] is
  * transport-specific: an IP for LAN.
@@ -34,6 +37,7 @@ data class DiscoveredHost(
     val kind: TransportKind,
     val address: String,
     val port: Int = 0,
+    val purpose: HostPurpose = HostPurpose.GAME,
 )
 
 /**
@@ -292,7 +296,11 @@ interface Transport {
     fun isAvailable(): Boolean
 
     /** Starts advertising and emits each client that connects. */
-    fun host(displayName: String, scope: CoroutineScope): Flow<Connection>
+    fun host(
+        displayName: String,
+        scope: CoroutineScope,
+        purpose: HostPurpose = HostPurpose.GAME,
+    ): Flow<Connection>
 
     /** Emits the current list of visible hosts as it changes. */
     fun discover(scope: CoroutineScope): Flow<List<DiscoveredHost>>

@@ -1,5 +1,6 @@
 package org.prolibertate.games.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -30,7 +32,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,18 +51,35 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.prolibertate.games.net.ScorekeeperSession
+import org.prolibertate.games.net.ScorekeeperSession.Role
+import org.prolibertate.games.score.AddPlayer
+import org.prolibertate.games.score.AddRound
+import org.prolibertate.games.score.ClearSheet
+import org.prolibertate.games.score.DeleteRound
+import org.prolibertate.games.score.EditRound
+import org.prolibertate.games.score.MovePlayer
+import org.prolibertate.games.score.RemovePlayer
+import org.prolibertate.games.score.RenamePlayer
 import org.prolibertate.games.score.ScorePlayer
 import org.prolibertate.games.score.ScoreSheet
+import org.prolibertate.games.score.ScoringMode
 import org.prolibertate.games.score.ScorekeeperRepository
+import org.prolibertate.games.score.SheetOp
+import org.prolibertate.games.score.StartSheet
 import kotlin.math.roundToInt
 
 /**
@@ -68,10 +89,18 @@ import kotlin.math.roundToInt
  *
  * The bottom row is always the one being filled in. Finish it and it is written
  * down, and a fresh empty row opens above the totals for the next round.
+ *
+ * The sheet can be shared. Sharing makes this device the host of a
+ * [ScorekeeperSession]; joining makes it a guest of somebody else's. Either way
+ * every change is a [SheetOp] — applied here when the sheet is only this
+ * device's, and handed to the session when it is not — so the grid below does
+ * not need to know which of the three it is drawing.
  */
 @Composable
 fun ScorekeeperScreen(
     repository: ScorekeeperRepository,
+    session: ScorekeeperSession,
+    playerName: String,
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -80,36 +109,130 @@ fun ScorekeeperScreen(
     // of storage on every change would put a DataStore round trip between a
     // keystroke and the digit appearing, which is how a field loses characters.
     var loaded by remember { mutableStateOf(false) }
-    var sheet by remember { mutableStateOf(ScoreSheet()) }
+    var local by remember { mutableStateOf(ScoreSheet()) }
     LaunchedEffect(Unit) {
-        sheet = repository.sheet.first()
+        local = repository.sheet.first()
         loaded = true
     }
 
-    val update: (ScoreSheet) -> Unit = { next ->
-        sheet = next
-        scope.launch { repository.save(next) }
-    }
-
+    val shared by session.state.collectAsState()
+    val role = shared.role
+    var joining by remember { mutableStateOf(false) }
+    var showShare by remember { mutableStateOf(false) }
     var confirmNewGame by remember { mutableStateOf(false) }
 
+    // A session lives exactly as long as this screen does: leaving it ends the
+    // sharing, and with it the links.
+    DisposableEffect(Unit) { onDispose { session.stop() } }
+
+    // What the host shares is the host's own sheet, so it is the one kept. A
+    // phone killed mid-game comes back to the sheet as the guests last saw it.
+    LaunchedEffect(shared.sheet, role) {
+        if (role == Role.HOST) repository.save(shared.sheet)
+    }
+
+    // Coming back to the screen after the phone was put down. A guest has missed
+    // whatever the host did in the meantime, and may have lost its link while the
+    // radio slept, so it asks again — the same thing a game table does.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) session.sync()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val sheet = if (role == Role.NONE) local else shared.sheet
+
+    val change: (SheetOp) -> Unit = { op ->
+        if (role == Role.NONE) {
+            val next = op.applyTo(local)
+            local = next
+            scope.launch { repository.save(next) }
+        } else {
+            session.edit(op)
+        }
+    }
+
+    // Stops whatever is going on with the network and goes back to this
+    // device's own sheet — which, for a host, is the one it has been keeping.
+    val leaveSharing: () -> Unit = {
+        if (role == Role.HOST) local = shared.sheet
+        session.stop()
+        joining = false
+        showShare = false
+    }
+
+    BackHandler(enabled = role == Role.GUEST || joining) { leaveSharing() }
+
     ScreenScaffold(
-        title = "Scorekeeper",
-        onBack = onBack,
+        title = when (role) {
+            Role.GUEST -> "Scorekeeper · ${shared.hostName}"
+            Role.HOST -> "Scorekeeper · sharing"
+            Role.NONE -> "Scorekeeper"
+        },
+        onBack = { if (role == Role.GUEST || joining) leaveSharing() else onBack() },
         actions = {
-            if (sheet.started) {
-                TextButton(onClick = { confirmNewGame = true }) { Text("New game") }
+            when (role) {
+                Role.NONE -> if (sheet.started && !joining) {
+                    // A sheet already on the go is no reason to hide the way to
+                    // somebody else's.
+                    TextButton(onClick = { joining = true }) { Text("Join") }
+                    TextButton(onClick = {
+                        session.startHosting(playerName, local)
+                        showShare = true
+                    }) { Text("Share") }
+                    TextButton(onClick = { confirmNewGame = true }) { Text("New game") }
+                }
+
+                Role.HOST -> {
+                    TextButton(onClick = { showShare = true }) {
+                        Text(
+                            when {
+                                shared.requests.isNotEmpty() -> "Sharing · ${shared.requests.size} waiting"
+                                shared.guests.isNotEmpty() -> "Sharing (${shared.guests.size})"
+                                else -> "Sharing"
+                            }
+                        )
+                    }
+                    if (sheet.started) {
+                        TextButton(onClick = { confirmNewGame = true }) { Text("New game") }
+                    }
+                }
+
+                // Rubbing out the sheet is the host's to do; a guest can leave
+                // and nothing more drastic.
+                Role.GUEST -> {
+                    TextButton(onClick = { session.sync() }) { Text("Sync") }
+                    TextButton(onClick = leaveSharing) { Text("Leave") }
+                }
             }
         },
     ) { modifier ->
         // Nothing is drawn until the stored sheet has been read, so a game in
         // progress does not flash the "how many are playing" pane first.
-        if (!loaded) {
-            Box(modifier = modifier)
-        } else if (!sheet.started) {
-            SetupPane(modifier = modifier) { count -> update(ScoreSheet.of(count)) }
-        } else {
-            Sheet(modifier = modifier, sheet = sheet, onChange = update)
+        when {
+            !loaded -> Box(modifier = modifier)
+
+            role == Role.GUEST && (shared.awaiting || shared.refused || !sheet.started) ->
+                WaitingPane(modifier = modifier, shared = shared, onLeave = leaveSharing)
+
+            role == Role.GUEST -> Column(modifier = modifier) {
+                ConnectionBanner(shared = shared, onSync = { session.sync() })
+                Scoring(modifier = Modifier.weight(1f), sheet = sheet, onOp = change)
+            }
+
+            joining && role == Role.NONE ->
+                JoinPane(modifier = modifier, session = session, shared = shared, playerName = playerName)
+
+            !sheet.started -> SetupPane(
+                modifier = modifier,
+                onStart = { count, mode -> change(StartSheet(count, mode)) },
+                onJoin = { joining = true },
+            )
+
+            else -> Scoring(modifier = modifier, sheet = sheet, onOp = change)
         }
     }
 
@@ -117,17 +240,46 @@ fun ScorekeeperScreen(
         AlertDialog(
             onDismissRequest = { confirmNewGame = false },
             title = { Text("Start a new game?") },
-            text = { Text("The players and every round scored so far are rubbed out.") },
+            text = {
+                Text(
+                    if (role == Role.HOST) {
+                        "The players and every round scored so far are rubbed out, " +
+                            "for everyone on the sheet."
+                    } else {
+                        "The players and every round scored so far are rubbed out."
+                    }
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmNewGame = false
-                    update(ScoreSheet())
+                    change(ClearSheet)
                 }) { Text("Rub it out") }
             },
             dismissButton = {
                 TextButton(onClick = { confirmNewGame = false }) { Text("Keep scoring") }
             },
         )
+    }
+
+    // Asked over whatever else is on screen, one at a time.
+    if (role == Role.HOST) {
+        shared.requests.firstOrNull()?.let { request ->
+            JoinRequestDialog(
+                request = request,
+                onAllow = { session.allow(request.id) },
+                onDeny = { session.deny(request.id) },
+            )
+        }
+        // Not under a request: two dialogs stacked is how an answer gets missed.
+        if (showShare && shared.requests.isEmpty()) {
+            ShareDialog(
+                shared = shared,
+                onRemove = { session.remove(it) },
+                onStop = leaveSharing,
+                onClose = { showShare = false },
+            )
+        }
     }
 }
 
@@ -137,8 +289,9 @@ fun ScorekeeperScreen(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SetupPane(modifier: Modifier, onStart: (Int) -> Unit) {
+private fun SetupPane(modifier: Modifier, onStart: (Int, ScoringMode) -> Unit, onJoin: () -> Unit) {
     var count by remember { mutableStateOf(ScoreSheet.DEFAULT_PLAYERS) }
+    var mode by remember { mutableStateOf(ScoringMode.ROUNDS) }
 
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
@@ -149,6 +302,28 @@ private fun SetupPane(modifier: Modifier, onStart: (Int) -> Unit) {
                 "whatever is on the table. A column each, a row per round, and the " +
                 "tally kept for you at the foot.",
             style = MaterialTheme.typography.bodyMedium,
+        )
+        Text("How is it scored?", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = mode == ScoringMode.ROUNDS,
+                onClick = { mode = ScoringMode.ROUNDS },
+                label = { Text("By round") },
+            )
+            FilterChip(
+                selected = mode == ScoringMode.TALLY,
+                onClick = { mode = ScoringMode.TALLY },
+                label = { Text("Tally") },
+            )
+        }
+        Text(
+            text = if (mode == ScoringMode.ROUNDS) {
+                "Everyone's points are written down together, a row per round."
+            } else {
+                "Anybody can score at any moment: tap +1, or enter any amount, " +
+                    "with no rounds to finish."
+            },
+            style = MaterialTheme.typography.bodySmall,
         )
         Text("How many are playing?", style = MaterialTheme.typography.labelLarge)
         FlowRow(
@@ -169,7 +344,10 @@ private fun SetupPane(modifier: Modifier, onStart: (Int) -> Unit) {
                 "without losing anybody's score.",
             style = MaterialTheme.typography.bodySmall,
         )
-        PrimaryAction(text = "Start scoring") { onStart(count) }
+        PrimaryAction(text = "Start scoring") { onStart(count, mode) }
+        OutlinedButton(onClick = onJoin, modifier = Modifier.fillMaxWidth()) {
+            Text("Join a shared sheet nearby")
+        }
     }
 }
 
@@ -178,7 +356,16 @@ private fun SetupPane(modifier: Modifier, onStart: (Int) -> Unit) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onChange: (ScoreSheet) -> Unit) {
+private fun Scoring(modifier: Modifier, sheet: ScoreSheet, onOp: (SheetOp) -> Unit) {
+    if (sheet.mode == ScoringMode.TALLY) {
+        TallySheet(modifier = modifier, sheet = sheet, onOp = onOp)
+    } else {
+        Sheet(modifier = modifier, sheet = sheet, onOp = onOp)
+    }
+}
+
+@Composable
+private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onOp: (SheetOp) -> Unit) {
     // One scroll state shared by the head, the rows and the totals, so all three
     // move together: a column and the name over it must never come apart. Every
     // row is built the same way and is therefore exactly the same width, which
@@ -213,7 +400,16 @@ private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onChange: (ScoreSheet) 
     // Keep the row being filled in in view when a round is written down.
     LaunchedEffect(sheet.rounds.size) { rows.animateScrollTo(rows.maxValue) }
 
-    val drag = rememberColumnDrag(sheet = sheet, onChange = onChange)
+    // On a shared sheet somebody else can delete the round being corrected from
+    // under it. There is then nothing to correct, and the row it was in is gone.
+    LaunchedEffect(sheet.rounds.size) {
+        if (correcting >= sheet.rounds.size) {
+            correcting = -1
+            correction.clear()
+        }
+    }
+
+    val drag = rememberColumnDrag(sheet = sheet, onOp = onOp)
 
     Column(modifier = modifier) {
         Text(
@@ -234,7 +430,7 @@ private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onChange: (ScoreSheet) 
             trailing = {
                 AddColumnCell(
                     enabled = sheet.players.size < ScoreSheet.MAX_PLAYERS,
-                    onClick = { onChange(sheet.withPlayerAdded()) },
+                    onClick = { onOp(AddPlayer) },
                 )
             },
         ) { index, player ->
@@ -360,18 +556,18 @@ private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onChange: (ScoreSheet) 
             onFlip = { editing[lastTyped] = flipSign(editing[lastTyped].orEmpty()) },
             onFinish = {
                 if (correcting >= 0) {
-                    onChange(sheet.withRoundAt(correcting, amountsAsPoints(correction)))
+                    onOp(EditRound(correcting, amountsAsPoints(correction)))
                     correcting = -1
                     correction.clear()
                 } else {
-                    onChange(sheet.withRound(amountsAsPoints(pending)))
+                    onOp(AddRound(amountsAsPoints(pending)))
                     pending.clear()
                 }
                 lastTyped = -1
                 focusPlayer = -1
             },
             onDelete = {
-                onChange(sheet.withoutRound(correcting))
+                onOp(DeleteRound(correcting))
                 correcting = -1
                 correction.clear()
                 lastTyped = -1
@@ -391,13 +587,158 @@ private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onChange: (ScoreSheet) 
         RenameDialog(
             sheet = sheet,
             player = renamed,
-            onName = { onChange(sheet.renamed(renamed.id, it)) },
+            onName = { onOp(RenamePlayer(renamed.id, it)) },
             onRemove = {
-                onChange(sheet.withPlayerRemoved(renamed.id))
+                onOp(RemovePlayer(renamed.id))
                 renaming = -1
             },
             onDismiss = { renaming = -1 },
         )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tally: points scored by anybody, whenever
+// ---------------------------------------------------------------------------
+
+/**
+ * A card per player with their running total and quick buttons, and the entries
+ * so far listed underneath, newest first. Each entry is a one-player row on the
+ * sheet, so tapping one in the list takes it back off.
+ */
+@Composable
+private fun TallySheet(modifier: Modifier, sheet: ScoreSheet, onOp: (SheetOp) -> Unit) {
+    var renaming by remember { mutableStateOf(-1) }
+
+    Column(modifier = modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Tap a name to rename it. Tap an entry below to take it back.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        sheet.players.forEach { player ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(Dp.Hairline, MaterialTheme.colorScheme.outline)
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = sheet.displayName(player),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).clickable { renaming = player.id },
+                )
+                Text(
+                    text = sheet.total(player.id).toString(),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.width(56.dp),
+                    textAlign = TextAlign.Center,
+                )
+                OutlinedButton(onClick = { onOp(AddRound(mapOf(player.id to -1))) }) { Text("−1") }
+                Button(onClick = { onOp(AddRound(mapOf(player.id to 1))) }) { Text("+1") }
+                AmountBox(onAmount = { onOp(AddRound(mapOf(player.id to it))) })
+            }
+        }
+        OutlinedButton(
+            onClick = { onOp(AddPlayer) },
+            enabled = sheet.players.size < ScoreSheet.MAX_PLAYERS,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Add a player") }
+
+        Text("Entries", style = MaterialTheme.typography.labelLarge)
+        if (sheet.rounds.isEmpty()) {
+            Text("Nothing scored yet.", style = MaterialTheme.typography.bodySmall)
+        }
+        sheet.rounds.indices.reversed().forEach { index ->
+            val entry = sheet.rounds[index].deltas.entries.firstOrNull()
+            val who = entry?.let { e -> sheet.players.firstOrNull { it.id == e.key } }
+            if (entry != null && who != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOp(DeleteRound(index)) }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("${index + 1}. ${sheet.displayName(who)}", style = MaterialTheme.typography.bodyMedium)
+                    Text(signed(entry.value), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
+
+    val renamed = sheet.players.firstOrNull { it.id == renaming }
+    if (renamed != null) {
+        RenameDialog(
+            sheet = sheet,
+            player = renamed,
+            onName = { onOp(RenamePlayer(renamed.id, it)) },
+            onRemove = {
+                onOp(RemovePlayer(renamed.id))
+                renaming = -1
+            },
+            onDismiss = { renaming = -1 },
+        )
+    }
+}
+
+/**
+ * A number box that scores whatever is typed into it. Tapping it brings up the
+ * number pad at once; Done on the pad adds the amount and clears the box. The
+ * ± inside flips the sign, since not every number pad has a minus.
+ */
+@Composable
+private fun AmountBox(onAmount: (Int) -> Unit) {
+    var text by remember { mutableStateOf("") }
+    val submit = {
+        text.toIntOrNull()?.let(onAmount)
+        text = ""
+    }
+    Row(
+        modifier = Modifier
+            .width(96.dp)
+            .height(44.dp)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.primary)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BasicTextField(
+            value = text,
+            onValueChange = { text = sanitiseAmount(it) },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { submit() }),
+            modifier = Modifier.weight(1f),
+            decorationBox = { field ->
+                Box(contentAlignment = Alignment.Center) {
+                    if (text.isEmpty()) {
+                        Text(
+                            text = "pts",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        )
+                    }
+                    field()
+                }
+            },
+        )
+        if (text.toIntOrNull() != null) {
+            Text(
+                text = "±",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.clickable { text = flipSign(text) }.padding(horizontal = 6.dp),
+            )
+        }
     }
 }
 
@@ -417,17 +758,17 @@ private fun Sheet(modifier: Modifier, sheet: ScoreSheet, onChange: (ScoreSheet) 
  * since.
  */
 @Composable
-private fun rememberColumnDrag(sheet: ScoreSheet, onChange: (ScoreSheet) -> Unit): ColumnDrag {
+private fun rememberColumnDrag(sheet: ScoreSheet, onOp: (SheetOp) -> Unit): ColumnDrag {
     val widthPx = with(LocalDensity.current) { PLAYER_COLUMN.toPx() }
     val currentSheet by rememberUpdatedState(sheet)
-    val commit by rememberUpdatedState(onChange)
+    val commit by rememberUpdatedState(onOp)
     return remember { ColumnDrag(widthPx, { currentSheet }, { commit(it) }) }
 }
 
 private class ColumnDrag(
     private val widthPx: Float,
     private val sheet: () -> ScoreSheet,
-    private val commit: (ScoreSheet) -> Unit,
+    private val commit: (SheetOp) -> Unit,
 ) {
     /** Which column is under the finger, or -1 when nothing is being dragged. */
     var index by mutableStateOf(-1)
@@ -454,7 +795,8 @@ private class ColumnDrag(
         val to = landing()
         index = -1
         offset = 0f
-        if (from >= 0 && to >= 0) commit(sheet().moved(from, to))
+        val moved = sheet().players.getOrNull(from)
+        if (moved != null && to >= 0 && to != from) commit(MovePlayer(moved.id, to))
     }
 
     fun cancel() {

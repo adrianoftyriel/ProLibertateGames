@@ -5,7 +5,9 @@ import android.provider.Settings as AndroidSettings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
+import org.prolibertate.games.net.LanTransport
 import org.prolibertate.games.net.LobbyController
+import org.prolibertate.games.net.ScorekeeperSession
 import org.prolibertate.games.score.ScorekeeperRepository
 import org.prolibertate.games.settings.SettingsRepository
 import org.prolibertate.games.ui.AppEnv
@@ -21,12 +23,23 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val peerId = stablePeerId()
+        // Its own transport rather than the lobby's: both listen on the same
+        // port, and a screen at a time is only ever using one of them.
+        val scoreLan = LanTransport(applicationContext)
+
         env = AppEnv(
             settingsRepository = SettingsRepository(applicationContext),
             updater = Updater(this),
             lobby = LobbyController(applicationContext, lifecycleScope),
             scorekeeper = ScorekeeperRepository(applicationContext),
-            peerId = stablePeerId(),
+            scoreSession = ScorekeeperSession(
+                transport = scoreLan,
+                endpoint = scoreLan.endpoint,
+                scope = lifecycleScope,
+                deviceId = peerId,
+            ),
+            peerId = peerId,
         )
 
         setContent {
@@ -50,6 +63,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (::env.isInitialized) env.lobby.stop()
+        if (::env.isInitialized) {
+            env.lobby.stop()
+            env.scoreSession.stop()
+        }
     }
 }

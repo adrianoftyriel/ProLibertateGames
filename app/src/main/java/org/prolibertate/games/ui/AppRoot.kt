@@ -43,6 +43,7 @@ import org.prolibertate.games.game.GameMenu
 import org.prolibertate.games.game.GameDescriptor
 import org.prolibertate.games.game.engine.TableConfig
 import org.prolibertate.games.net.LobbyController
+import org.prolibertate.games.net.ScorekeeperSession
 import org.prolibertate.games.score.ScorekeeperRepository
 import org.prolibertate.games.settings.Settings
 import org.prolibertate.games.settings.SettingsRepository
@@ -56,6 +57,8 @@ class AppEnv(
     val updater: Updater,
     val lobby: LobbyController,
     val scorekeeper: ScorekeeperRepository,
+    /** The shared score sheet, for the Scorekeeper to host or join. */
+    val scoreSession: ScorekeeperSession,
     val peerId: String,
 )
 
@@ -186,6 +189,8 @@ private fun AppContent(
 
         is Route.Scorekeeper -> ScorekeeperScreen(
             repository = env.scorekeeper,
+            session = env.scoreSession,
+            playerName = settings.displayName,
             onBack = { pop() },
         )
 

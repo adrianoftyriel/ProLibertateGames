@@ -129,6 +129,18 @@ class LobbyController(
         jobs += scope.launch {
             connection.incoming.collect { message ->
                 if (message !is Hello) return@collect
+                if (message.purpose != PURPOSE_GAME) {
+                    connection.send(
+                        Welcome(
+                            hostName = _state.value.hostName,
+                            gameId = _state.value.gameId.orEmpty(),
+                            accepted = false,
+                            reason = "That is a game, not a score sheet.",
+                        )
+                    )
+                    connection.close()
+                    return@collect
+                }
                 if (message.protocol != PROTOCOL_VERSION) {
                     connection.send(
                         Welcome(
@@ -257,7 +269,9 @@ class LobbyController(
         _state.value = State(joining = true, message = "Looking for games…")
         for (transport in availableTransports()) {
             jobs += scope.launch {
-                transport.discover(scope).collect { hosts ->
+                transport.discover(scope).collect { found ->
+                    // Score sheets are joined from the Scorekeeper, not from here.
+                    val hosts = found.filter { it.purpose == HostPurpose.GAME }
                     val others = _state.value.discovered.filter { it.kind != transport.kind }
                     _state.value = _state.value.copy(discovered = others + hosts)
                 }
