@@ -38,6 +38,12 @@ fi
 # failure must stop the deploy rather than silently dropping that channel.
 code="$(curl -sS -o "$out/$other/latest.json" -w '%{http_code}' "$base/$other/latest.json" || true)"
 : "${code:=000}"
+# Cloudflare error 1014 (403 + "error code: 1014") means the domain's CNAME
+# points at a Pages project that does not exist yet, so there is nothing to
+# preserve — the same as a 404, and what a push-triggered first deploy sees.
+if [ "$code" = 403 ] && grep -q 'error code: 1014' "$out/$other/latest.json" 2>/dev/null; then
+  code=404
+fi
 if [ "$code" = 404 ]; then
   echo "No $other channel published yet; skipping."
   rm -rf "$out/$other"
