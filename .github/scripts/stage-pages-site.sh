@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Assembles the Cloudflare Pages site for plg.wallacenet.ca into ./pages-out.
+#
+# Usage: stage-pages-site.sh <prod|dev> <tag> <apk-path>
+#
+# A Pages deploy replaces the whole site, and both channels live in one site,
+# so this stages the channel being published and then re-fetches the *other*
+# channel's current files from the live site so the deploy does not erase them.
+set -euo pipefail
+
+channel="$1"; tag="$2"; apk="$3"
+base="${PAGES_BASE_URL:-https://plg.wallacenet.ca}"
+out="pages-out"
+limit=$((25 * 1024 * 1024)) # Cloudflare Pages: 25 MiB per file
+
+case "$channel" in prod) other=dev ;; dev) other=prod ;; *) echo "bad channel: $channel" >&2; exit 2 ;; esac
+
+rm -rf "$out"
+mkdir -p "$out/$channel" "$out/$other"
+cp site/index.html site/_headers "$out/"
+
+name="$(basename "$apk")"
+cp "$apk" "$out/$channel/$name"
+cp "$apk" "$out/$channel/ProLibertateGames.apk"
+jq -n --arg tag "$tag" --arg name "$name" --arg ch "$channel" --arg url "$base/$channel/$name" \
+  '{tag: $tag, apkName: $name, apkUrl: $url, channel: $ch}' > "$out/$channel/latest.json"
+
+# Carry the other channel over. 404 means it was never published; any other
+# failure must stop the deploy rather than silently dropping that channel.
+code="$(curl -sS -o "$out/$other/latest.json" -w '%{http_code}' "$base/$other/latest.json" || true)"
+: "${code:=000}"
+if [ "$code" = 404 ]; then
+  echo "No $other channel published yet; skipping."
+  rm -rf "$out/$other"
+elif [ "$code" = 200 ]; then
+  other_name="$(jq -er .apkName "$out/$other/latest.json")"
+  curl -fsS -o "$out/$other/$other_name" "$base/$other/$other_name"
+  cp "$out/$other/$other_name" "$out/$other/ProLibertateGames.apk"
+else
+  echo "Fetching $other/latest.json returned HTTP $code; refusing to deploy." >&2
+  exit 1
+fi
+
+find "$out" -name '*.apk' -size +"${limit}c" -print | grep . >&2 && {
+  echo "APK exceeds Cloudflare Pages' 25 MiB per-file limit." >&2; exit 1; } || true
+find "$out" -type f | sort

@@ -24,6 +24,8 @@ jobs:
     # anything else is a no-op rather than shipping unreviewed code to everyone.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.stage.outputs.version }}
     env:
       # Stamps the APK as a production-channel build, versioned with the run
       # number that matches the tag published below.
@@ -69,7 +71,7 @@ jobs:
       - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ProLibertateGames-apk
+          name: plg-prod-staged
           path: ${{ steps.stage.outputs.apk }}
           if-no-files-found: error
 
@@ -91,3 +93,42 @@ jobs:
           Both files below are the same build. \`ProLibertateGames.apk\` is a copy under a fixed name, so this link always fetches the newest release and can be bookmarked or shared:
 
           https://github.com/${{ github.repository }}/releases/latest/download/ProLibertateGames.apk"
+
+  # Publishes the build to https://plg.wallacenet.ca (Cloudflare Pages). Runs
+  # alongside the GitHub release above for one deployment so already-installed
+  # apps, which still read GitHub, can fetch the updater that reads Cloudflare.
+  #
+  # Both workflows deploy into one Pages site, and a deploy replaces the whole
+  # site, so they share a concurrency group and never run at the same time.
+  deploy-pages:
+    name: Deploy to Cloudflare Pages
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: plg-pages-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download staged APK
+        uses: actions/download-artifact@v4
+        with:
+          name: plg-prod-staged
+          path: staged
+
+      - name: Assemble site
+        run: .github/scripts/stage-pages-site.sh prod "${{ needs.build.outputs.version }}" "staged/ProLibertateGames-${{ needs.build.outputs.version }}.apk"
+
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          # Creates the project on first run; fails harmlessly if it exists.
+          npx --yes wrangler@3 pages project create plg --production-branch main || true
+          # --branch main makes this the production deployment, which is what
+          # plg.wallacenet.ca serves, whichever branch the workflow ran on.
+          npx --yes wrangler@3 pages deploy pages-out --project-name plg --branch main --commit-dirty=true

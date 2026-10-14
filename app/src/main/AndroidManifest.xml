@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- OTA updates from GitHub Releases, plus LAN play over TCP sockets. -->
+    <!-- OTA updates from plg.wallacenet.ca, plus LAN play over TCP sockets. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Network Service Discovery needs multicast to see hosts on the LAN. -->
