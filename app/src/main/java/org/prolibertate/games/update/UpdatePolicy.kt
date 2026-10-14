@@ -21,7 +21,7 @@ enum class UpdateChannel(val label: String, val blurb: String) {
 /** Marks a tag or a version name as belonging to the dev channel. */
 const val DEV_SUFFIX = "-dev"
 
-/** One published build, as read off a GitHub release. */
+/** One published build, as read off a channel's `latest.json`. */
 data class Release(
     val tag: String,
     val versionCode: Int,
@@ -70,7 +70,7 @@ fun versionCodeOfTag(tag: String): Int? =
  * nothing at all.
  *
  * Only an actual update is worth a word. Opening the app is not asking a
- * question, so a check that finds nothing — or that cannot reach GitHub at all
+ * question, so a check that finds nothing — or that cannot reach the update server at all
  * — stays quiet; a phone on a train would otherwise be told off for it every
  * single launch. The button in Settings *is* asking a question, and reports
  * every answer including those two.

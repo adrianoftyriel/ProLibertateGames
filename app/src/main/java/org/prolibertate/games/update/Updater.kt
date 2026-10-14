@@ -8,19 +8,17 @@ import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Over-the-air updates from the repository's GitHub Releases.
+ * Over-the-air updates from plg.wallacenet.ca (Cloudflare Pages).
  *
  * Release tags are v<series>.<run-number> and the APK's versionCode is that same run
  * number, so comparing the two is enough to tell whether a newer build exists.
- * The repository's releases must be publicly downloadable — no token is
- * embedded in the app, and GitHub blocks anonymous access to private assets.
+ * Everything there is public — no token is embedded in the app.
  *
  * There is nothing to choose here. The channel comes from the running APK, so
  * a dev install looks only at dev builds and a production install only at
@@ -48,77 +46,39 @@ class Updater(private val activity: Activity) {
     }
 
     /**
-     * Production reads GitHub's "latest release", which by definition skips
-     * prereleases. Dev walks the release list for the newest prerelease, which
-     * is what the CI pipeline publishes from the dev branch.
+     * Each channel publishes a `latest.json` next to its APK on Cloudflare
+     * Pages: `/prod/latest.json` and `/dev/latest.json`. The two live in one
+     * site but separate paths, so a build can only ever look down its own line.
      */
-    private fun fetchLatestRelease(channel: UpdateChannel): Release? = when (channel) {
-        UpdateChannel.PRODUCTION ->
-            getJsonObject("https://api.github.com/repos/$OWNER/$REPO/releases/latest")
-                ?.let { toRelease(it) }
-
-        UpdateChannel.DEV ->
-            getJsonArray("https://api.github.com/repos/$OWNER/$REPO/releases?per_page=30")
-                ?.let { releases ->
-                    // GitHub returns newest first.
-                    (0 until releases.length())
-                        .map { releases.getJSONObject(it) }
-                        .firstOrNull { it.optBoolean("prerelease") && !it.optBoolean("draft") }
-                        ?.let { toRelease(it) }
-                }
+    private fun fetchLatestRelease(channel: UpdateChannel): Release? {
+        val path = if (channel == UpdateChannel.DEV) "dev" else "prod"
+        return getJsonObject("$BASE_URL/$path/latest.json")?.let { toRelease(it) }
     }
 
     private fun toRelease(json: JSONObject): Release? {
-        val tag = json.optString("tag_name").ifBlank { return null }
+        val tag = json.optString("tag").ifBlank { return null }
         val versionCode = versionCodeOfTag(tag) ?: return null
-        val channel = channelOfTag(tag, json.optBoolean("prerelease"))
-
-        val assets = json.optJSONArray("assets") ?: return null
-        val apks = (0 until assets.length())
-            .map { assets.getJSONObject(it) }
-            .filter { it.optString("name").endsWith(".apk") }
-
-        // A production release carries the same build twice: once named for its
-        // version, and once under a fixed name so a permanent download link
-        // exists. Pick the versioned one explicitly rather than whichever was
-        // uploaded first, so what gets installed is traceable to its tag.
-        val chosen = apks.firstOrNull { it.optString("name").contains(tag) }
-            ?: apks.firstOrNull()
-            ?: return null
-
+        val apkUrl = json.optString("apkUrl").ifBlank { return null }
         return Release(
             tag = tag,
             versionCode = versionCode,
-            apkUrl = chosen.getString("browser_download_url"),
-            apkName = chosen.optString("name"),
-            channel = channel,
+            apkUrl = apkUrl,
+            apkName = json.optString("apkName"),
+            channel = channelOfTag(tag, prerelease = false),
         )
     }
 
-    private fun openConnection(url: String): HttpURLConnection =
-        (URL(url).openConnection() as HttpURLConnection).apply {
+    private fun getJsonObject(url: String): JSONObject? {
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
-            setRequestProperty("Accept", "application/vnd.github+json")
             setRequestProperty("User-Agent", "ProLibertateGames-Updater")
             connectTimeout = 15_000
             readTimeout = 15_000
         }
-
-    private fun getJsonObject(url: String): JSONObject? {
-        val connection = openConnection(url)
         try {
+            // 404 means the channel has nothing published yet.
             if (connection.responseCode != 200) return null
             return JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    private fun getJsonArray(url: String): JSONArray? {
-        val connection = openConnection(url)
-        try {
-            if (connection.responseCode != 200) return null
-            return JSONArray(connection.inputStream.bufferedReader().use { it.readText() })
         } finally {
             connection.disconnect()
         }
@@ -175,7 +135,6 @@ class Updater(private val activity: Activity) {
         activity.packageManager.getPackageInfo(activity.packageName, 0).versionName ?: "unknown"
 
     private companion object {
-        const val OWNER = "adrianoftyriel"
-        const val REPO = "ProLibertateGames"
+        const val BASE_URL = "https://plg.wallacenet.ca"
     }
 }

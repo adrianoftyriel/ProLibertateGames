@@ -198,9 +198,33 @@ production package instead.
   publishes it as a GitHub Release tagged `v<series>.<run-number>`. The in-app updater
   reads that tag, which is why the APK's `versionCode` is the same run number.
 
+### Hosting: plg.wallacenet.ca
+
+Both channels are also deployed to one Cloudflare Pages project (`plg`), served at
+`https://plg.wallacenet.ca`:
+
+```
+/                        landing page (reads both latest.json files)
+/prod/latest.json        {tag, apkName, apkUrl, channel} — what the updater reads
+/prod/ProLibertateGames.apk, /prod/ProLibertateGames-v<series>.<n>.apk
+/dev/...                 same, for the dev channel
+```
+
+Each workflow's `deploy-pages` job runs `.github/scripts/stage-pages-site.sh`,
+which stages its own channel and re-fetches the other channel from the live site,
+because a Pages deploy replaces everything. The two share a concurrency group so
+they cannot race. Needs repo secrets `CLOUDFLARE_API_TOKEN` (Account → Cloudflare
+Pages → Edit) and `CLOUDFLARE_ACCOUNT_ID`. Pages caps files at 25 MiB.
+
+**First deploy:** the site does not exist yet, so the domain answers 403 (Cloudflare error 1014) and the carry-over fetch would abort. Dispatch the workflow once with `first_deploy` ticked, then attach `plg.wallacenet.ca` as a custom domain on the new `plg` Pages project. Later runs need no input.
+
+The in-app updater reads these `latest.json` files. GitHub Releases are still
+published for one transition deployment so installs that predate this change can
+fetch it; after that, remove the GitHub release steps from both workflows.
+
 ### Installing without the app
 
-The newest production build is always at this link, which never changes:
+The newest production build is always at **https://plg.wallacenet.ca/prod/ProLibertateGames.apk** (dev: `/dev/ProLibertateGames.apk`). The GitHub link below remains during the transition:
 
 **https://github.com/adrianoftyriel/ProLibertateGames/releases/latest/download/ProLibertateGames.apk**
 
@@ -367,7 +391,7 @@ game/          rules engines and AI — pure Kotlin, no Android, unit-tested
 net/           wire protocol, LAN transport, lobby, match driver
 score/         scorekeeper sheet — pure Kotlin, unit-tested — and its store
 settings/      DataStore-backed preferences
-update/        GitHub Releases OTA updater, and the channel rule — pure, tested
+update/        Cloudflare Pages OTA updater, and the channel rule — pure, tested
 ui/            Compose screens
 ```
 

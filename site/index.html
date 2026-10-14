@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pro Libertate Games</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+  body { max-width: 32rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+  .card { border: 1px solid #8884; border-radius: .5rem; padding: 1rem; margin: 1rem 0; }
+  a.dl { display: inline-block; padding: .5rem 1rem; border-radius: .4rem; background: #2563eb; color: #fff; text-decoration: none; }
+  small { opacity: .7; }
+</style>
+</head>
+<body>
+<h1>Pro Libertate Games</h1>
+<p>Android builds. Allow <em>Install unknown apps</em> for your browser to sideload.</p>
+<div class="card" id="production"><h2>Production</h2><p>Loading…</p></div>
+<div class="card" id="dev"><h2>Dev</h2><p>Loading…</p></div>
+<script>
+for (const [channel, path] of [["production", "prod"], ["dev", "dev"]]) {
+  const box = document.getElementById(channel);
+  const title = box.querySelector("h2").outerHTML;
+  fetch(`/${path}/latest.json`, { cache: "no-cache" })
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(j => {
+      box.innerHTML = `${title}<p><a class="dl" href="${j.apkUrl}">Download ${j.tag}</a></p>` +
+        `<small>Always newest: <a href="/${path}/ProLibertateGames.apk">/${path}/ProLibertateGames.apk</a></small>`;
+    })
+    .catch(() => { box.innerHTML = `${title}<p>No build published yet.</p>`; });
+}
+</script>
+</body>
+</html>
