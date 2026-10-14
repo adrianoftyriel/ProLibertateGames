@@ -17,7 +17,7 @@ case "$channel" in prod) other=dev ;; dev) other=prod ;; *) echo "bad channel: $
 
 rm -rf "$out"
 mkdir -p "$out/$channel" "$out/$other"
-cp site/index.html site/_headers "$out/"
+cp site/index.html site/404.html site/_headers "$out/"
 
 name="$(basename "$apk")"
 cp "$apk" "$out/$channel/$name"
@@ -46,6 +46,11 @@ if [ "$code" = 403 ] && grep -q 'error code: 1014' "$out/$other/latest.json" 2>/
 fi
 if [ "$code" = 404 ]; then
   echo "No $other channel published yet; skipping."
+  rm -rf "$out/$other"
+elif [ "$code" = 200 ] && ! jq -e .apkName "$out/$other/latest.json" >/dev/null 2>&1; then
+  # A 200 that is not our JSON: Pages without a 404.html answers unknown paths
+  # with index.html. Nothing is published on that channel.
+  echo "No $other channel published yet (200 but no latest.json); skipping."
   rm -rf "$out/$other"
 elif [ "$code" = 200 ]; then
   other_name="$(jq -er .apkName "$out/$other/latest.json")"
