@@ -1,0 +1,7 @@
+/*/latest.json
+  Cache-Control: no-cache
+  Access-Control-Allow-Origin: *
+
+/*.apk
+  Content-Type: application/vnd.android.package-archive
+  Cache-Control: public, max-age=300
