@@ -6,6 +6,11 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      first_deploy:
+        description: "First Cloudflare deploy: skip carrying over the other channel (the site does not exist yet)"
+        type: boolean
+        default: false
 
 # Allow the built-in token to create releases and upload the APK.
 permissions:
@@ -119,6 +124,8 @@ jobs:
           path: staged
 
       - name: Assemble site
+        env:
+          PLG_SKIP_OTHER: ${{ inputs.first_deploy && '1' || '' }}
         run: .github/scripts/stage-pages-site.sh prod "${{ needs.build.outputs.version }}" "staged/ProLibertateGames-${{ needs.build.outputs.version }}.apk"
 
       - name: Deploy

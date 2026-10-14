@@ -216,6 +216,8 @@ because a Pages deploy replaces everything. The two share a concurrency group so
 they cannot race. Needs repo secrets `CLOUDFLARE_API_TOKEN` (Account → Cloudflare
 Pages → Edit) and `CLOUDFLARE_ACCOUNT_ID`. Pages caps files at 25 MiB.
 
+**First deploy:** the site does not exist yet, so the domain answers 403 (Cloudflare error 1014) and the carry-over fetch would abort. Dispatch the workflow once with `first_deploy` ticked, then attach `plg.wallacenet.ca` as a custom domain on the new `plg` Pages project. Later runs need no input.
+
 The in-app updater reads these `latest.json` files. GitHub Releases are still
 published for one transition deployment so installs that predate this change can
 fetch it; after that, remove the GitHub release steps from both workflows.
