@@ -25,6 +25,15 @@ cp "$apk" "$out/$channel/ProLibertateGames.apk"
 jq -n --arg tag "$tag" --arg name "$name" --arg ch "$channel" --arg url "$base/$channel/$name" \
   '{tag: $tag, apkName: $name, apkUrl: $url, channel: $ch}' > "$out/$channel/latest.json"
 
+# PLG_SKIP_OTHER=1 is for the very first deploy, when the site does not exist
+# yet and the domain answers 403 (Cloudflare error 1014) instead of 404.
+if [ -n "${PLG_SKIP_OTHER:-}" ]; then
+  echo "PLG_SKIP_OTHER set; not carrying over $other."
+  rm -rf "$out/$other"
+  find "$out" -type f | sort
+  exit 0
+fi
+
 # Carry the other channel over. 404 means it was never published; any other
 # failure must stop the deploy rather than silently dropping that channel.
 code="$(curl -sS -o "$out/$other/latest.json" -w '%{http_code}' "$base/$other/latest.json" || true)"

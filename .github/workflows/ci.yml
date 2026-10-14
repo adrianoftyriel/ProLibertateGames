@@ -16,6 +16,11 @@ on:
   pull_request:
     branches: [ main, dev ]
   workflow_dispatch:
+    inputs:
+      first_deploy:
+        description: "First Cloudflare deploy: skip carrying over the other channel (the site does not exist yet)"
+        type: boolean
+        default: false
 
 # Needed to publish the dev-channel prerelease below.
 permissions:
@@ -162,6 +167,8 @@ jobs:
           path: staged
 
       - name: Assemble site
+        env:
+          PLG_SKIP_OTHER: ${{ inputs.first_deploy && '1' || '' }}
         run: .github/scripts/stage-pages-site.sh dev "${{ needs.build.outputs.version }}" "staged/ProLibertateGames-${{ needs.build.outputs.version }}.apk"
 
       - name: Deploy
